@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "prod": "loteria-55688",
+    "default": "loteria-55688"
+  },
+  "targets": {},
+  "etags": {}
+}
