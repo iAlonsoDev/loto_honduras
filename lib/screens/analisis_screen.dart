@@ -608,23 +608,33 @@ class _AnalisisScreenState extends State<AnalisisScreen>
           ],
         ),
       ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.goldColor),
-            )
-          : _error != null
-          ? _buildError()
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildTabGeneral(),
-                _buildTabRachas(),
-                _buildTabHorarios(),
-                _buildTabSemana(),
-                _buildTabPares(),
-                _buildTabPredicciones(),
-              ],
-            ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: _buildBuscadorUnificado(),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppTheme.goldColor),
+                  )
+                : _error != null
+                ? _buildError()
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildTabGeneral(),
+                      _buildTabRachas(),
+                      _buildTabHorarios(),
+                      _buildTabSemana(),
+                      _buildTabPares(),
+                      _buildTabPredicciones(),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2044,21 +2054,18 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   // ── TAB 6: PREDICCIONES ────────────────────────────────────────────────────────
 
   Widget _buildTabPredicciones() {
-    // layout with fixed search bar and expanding content area
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildBuscadorUnificado(),
-              const SizedBox(height: 16),
               const Text(
                 '🔮 Predicciones Inteligentes',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               const Text(
                 'Busca un número específico para análisis detallado o filtra todos los números por patrón.',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
@@ -2066,6 +2073,7 @@ class _AnalisisScreenState extends State<AnalisisScreen>
             ],
           ),
         ),
+        const SizedBox(height: 12),
         Expanded(
           child: _numeroBuscado != null
               ? SingleChildScrollView(

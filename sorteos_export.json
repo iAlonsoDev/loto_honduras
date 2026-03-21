@@ -5843,5 +5843,35 @@
     "maniana": 11,
     "tarde": 92,
     "noche": 84
+  },
+  "2026-03-15": {
+    "maniana": 24,
+    "tarde": 9,
+    "noche": 49
+  },
+  "2026-03-16": {
+    "maniana": 83,
+    "tarde": 70,
+    "noche": 84
+  },
+  "2026-03-17": {
+    "maniana": 23,
+    "tarde": 59,
+    "noche": 30
+  },
+  "2026-03-18": {
+    "maniana": 20,
+    "tarde": 77,
+    "noche": 57
+  },
+  "2026-03-19": {
+    "maniana": 74,
+    "tarde": 63,
+    "noche": 81
+  },
+  "2026-03-20": {
+    "maniana": 93,
+    "tarde": 61,
+    "noche": null
   }
 }
