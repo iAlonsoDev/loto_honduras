@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(flutter pub get)"
+      "Bash(flutter pub get)",
+      "Bash(flutter analyze:*)",
+      "Bash(python3:*)",
+      "Bash(/tmp/extract_2026.sh:*)",
+      "Bash(__NEW_LINE_e6eb2b0a61516c90__ bash:*)",
+      "Bash(jq -r 'to_entries[] | select\\(.key | startswith\\(\"\"2026\"\"\\)\\) | \"\"\\\\\\(.key\\) maniana \\\\\\(.value.maniana\\) tarde \\\\\\(.value.tarde\\) noche \\\\\\(.value.noche\\)\"\"' sorteos_export.json)",
+      "Bash(__NEW_LINE_d87956ede6916b03__ echo:*)",
+      "Bash(tr '|' '\\\\n')",
+      "Bash(grep '^41$')",
+      "Bash(python -c \"import json; print\\(''json ok''\\)\")",
+      "Bash(python analisis_patrones.py)",
+      "Bash(python -X utf8 analisis_patrones.py)",
+      "Bash(dart analyze:*)"
     ]
   }
 }

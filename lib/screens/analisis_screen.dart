@@ -6,12 +6,7 @@ import '../models/sorteo_model.dart';
 import '../services/firestore_service.dart';
 import '../theme/app_theme.dart';
 import '../data/libro_suenos.dart';
-
-class _RachaInfo {
-  final int numero, diasActual, maxHistorico;
-  const _RachaInfo(this.numero, this.diasActual, this.maxHistorico);
-  double get ratio => maxHistorico > 0 ? diasActual / maxHistorico : 0;
-}
+import '../data/grupos_semanticos.dart';
 
 class AnalisisScreen extends StatefulWidget {
   const AnalisisScreen({super.key});
@@ -29,6 +24,7 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   // Base
   List<EstadisticaNumero> _calientes = [];
   List<EstadisticaNumero> _frios = [];
+  List<EstadisticaNumero> _repetidosMes = [];
   Map<int, EstadisticaNumero>? _allStats;
   int _totalSorteos = 0;
   bool _loading = true;
@@ -46,6 +42,11 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   // Búsqueda global
   String _searchGlobal = '';
   late TextEditingController _searchController;
+
+  // Quebrados
+  int? _numeroQuebradoAnalizado;
+  late TextEditingController _quebradoCtrl;
+  String _qPeriodo = 'historico';
 
   // Relaciones profundas
   Map<int, List<int>> _espejos = {};
@@ -72,6 +73,7 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+    _quebradoCtrl = TextEditingController();
     _tabController = TabController(length: 6, vsync: this);
     _cargar();
   }
@@ -80,6 +82,7 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _quebradoCtrl.dispose();
     super.dispose();
   }
 
@@ -122,6 +125,7 @@ class _AnalisisScreenState extends State<AnalisisScreen>
           _estadisticasProfundas = _computeEstadisticasProfundas(sorteos);
           _secuenciasHistoricas = _computeSecuenciasHistoricas(sorteos);
           _prediccionesProfundas = _computePrediccionesProfundas(sorteos);
+          _repetidosMes = _computeRepetidosMes(sorteos);
           _loading = false;
         });
       }
@@ -600,11 +604,11 @@ class _AnalisisScreenState extends State<AnalisisScreen>
           tabAlignment: TabAlignment.start,
           tabs: const [
             Tab(icon: Icon(Icons.bar_chart_rounded), text: 'General'),
-            Tab(icon: Icon(Icons.timeline_rounded), text: 'Rachas'),
             Tab(icon: Icon(Icons.schedule_rounded), text: 'Horarios'),
             Tab(icon: Icon(Icons.calendar_view_week_rounded), text: 'Semana'),
             Tab(icon: Icon(Icons.compare_arrows_rounded), text: 'Pares'),
             Tab(icon: Icon(Icons.psychology_rounded), text: 'Predicciones'),
+            Tab(icon: Icon(Icons.grid_view_rounded), text: 'Quebrados'),
           ],
         ),
       ),
@@ -625,11 +629,11 @@ class _AnalisisScreenState extends State<AnalisisScreen>
                     controller: _tabController,
                     children: [
                       _buildTabGeneral(),
-                      _buildTabRachas(),
                       _buildTabHorarios(),
                       _buildTabSemana(),
                       _buildTabPares(),
                       _buildTabPredicciones(),
+                      _buildTabQuebrados(),
                     ],
                   ),
           ),
@@ -679,8 +683,6 @@ class _AnalisisScreenState extends State<AnalisisScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSugerencia(),
-          const SizedBox(height: 20),
-          _buildExplicacion(),
           const SizedBox(height: 20),
           _buildSeccionTitle(
             '🔥 Números Calientes',
@@ -739,6 +741,18 @@ class _AnalisisScreenState extends State<AnalisisScreen>
             ],
             const SizedBox(height: 20),
           ],
+          _buildSeccionTitle(
+            '📅 Más repetidos este mes',
+            'Números que más veces han salido en el mes actual',
+          ),
+          const SizedBox(height: 8),
+          _buildChipList(
+            _filterBySearch(_repetidosMes),
+            Colors.orange,
+            true,
+            null,
+          ),
+          const SizedBox(height: 20),
           _buildSeccionTitle(
             '🗓️ Números faltantes',
             'No han salido este año, trimestre o mes actual',
@@ -824,216 +838,33 @@ class _AnalisisScreenState extends State<AnalisisScreen>
     return _numerosNoSalidosEntre(inicio, fin);
   }
 
-  // ── TAB 2: RACHAS ────────────────────────────────────────────────────────────
-
-  Widget _buildTabRachas() {
-    if (_allStats == null) return const SizedBox();
-    final rachas = <_RachaInfo>[];
-    for (int n = 0; n <= 99; n++) {
-      final stat = _allStats![n]!;
-      if (stat.frecuencia < 5) continue;
-      final maxAus = _maxAusencias[n] ?? 0;
-      if (maxAus == 0) continue;
-      rachas.add(_RachaInfo(n, stat.diasSinSalir(), maxAus));
+  List<EstadisticaNumero> _computeRepetidosMes(List<SorteoModel> sorteos) {
+    final ahora = DateTime.now();
+    final inicio = DateTime(ahora.year, ahora.month, 1);
+    final fin = DateTime(ahora.year, ahora.month + 1, 1)
+        .subtract(const Duration(days: 1));
+    final stats = {
+      for (int i = 0; i <= 99; i++) i: EstadisticaNumero(numero: i),
+    };
+    for (final s in sorteos) {
+      if (s.fecha.isBefore(inicio) || s.fecha.isAfter(fin)) continue;
+      for (final num in [s.numeroManiana, s.numeroTarde, s.numeroNoche]) {
+        if (num == null || num < 0 || num > 99) continue;
+        stats[num]!.frecuencia++;
+        stats[num]!.apariciones.add(s.fecha);
+        if (stats[num]!.ultimaVez == null ||
+            s.fecha.isAfter(stats[num]!.ultimaVez!)) {
+          stats[num]!.ultimaVez = s.fecha;
+        }
+      }
     }
-    rachas.sort((a, b) => b.ratio.compareTo(a.ratio));
-
-    // Filtrar por búsqueda
-    final rachasFiltered = _searchGlobal.isEmpty
-        ? rachas
-        : rachas.where((r) {
-            final num = r.numero.toString().padLeft(2, '0');
-            final sig = significadoCorto(r.numero).toLowerCase();
-            return num.contains(_searchGlobal) ||
-                sig.contains(_searchGlobal.toLowerCase());
-          }).toList();
-
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          color: AppTheme.cardColor,
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${rachasFiltered.length} de ${rachas.length} números',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (_searchGlobal.isNotEmpty)
-                    GestureDetector(
-                      onTap: () {
-                        _searchController.clear();
-                        setState(() => _searchGlobal = '');
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.goldColor.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'Limpiar',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.goldColor,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Ordenados por cercanía a su récord histórico de ausencia',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: rachasFiltered.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 40,
-                          color: Colors.grey.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No encontramos rachas para "$_searchGlobal"',
-                          style: const TextStyle(color: Colors.grey),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: rachasFiltered.length,
-                  itemBuilder: (ctx, i) => _buildRachaCard(rachasFiltered[i]),
-                ),
-        ),
-      ],
-    );
+    return (stats.values.where((e) => e.frecuencia > 0).toList()
+          ..sort((a, b) => b.frecuencia.compareTo(a.frecuencia)))
+        .take(15)
+        .toList();
   }
 
-  Widget _buildRachaCard(_RachaInfo r) {
-    final ratio = r.ratio.clamp(0.0, 1.0);
-    Color color;
-    String estado;
-    if (ratio >= 0.9) {
-      color = Colors.red;
-      estado = '🚨 Récord en peligro';
-    } else if (ratio >= 0.7) {
-      color = AppTheme.orangeColor;
-      estado = '⚠️ Ausencia alta';
-    } else if (ratio >= 0.5) {
-      color = AppTheme.goldColor;
-      estado = '👀 A vigilar';
-    } else {
-      color = Colors.grey;
-      estado = '';
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: color),
-              ),
-              child: Center(
-                child: Text(
-                  r.numero.toString().padLeft(2, '0'),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        '${r.numero.toString().padLeft(2, '0')} · ${significadoCorto(r.numero)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                      if (estado.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          estado,
-                          style: TextStyle(fontSize: 10, color: color),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Sin salir: ${r.diasActual} días  ·  Récord histórico: ${r.maxHistorico} días',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: ratio,
-                      backgroundColor: Colors.grey.withValues(alpha: 0.2),
-                      color: color,
-                      minHeight: 6,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '${(ratio * 100).toStringAsFixed(0)}%',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: color,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── TAB 3: HORARIOS ──────────────────────────────────────────────────────────
+  // ── TAB 2: HORARIOS ──────────────────────────────────────────────────────────
 
   Widget _buildTabHorarios() {
     final topM =
@@ -1076,12 +907,6 @@ class _AnalisisScreenState extends State<AnalisisScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Si el sorteo fuera 100% aleatorio, cada número debería aparecer igual en cada horario. '
-            'Las diferencias pueden indicar sesgos.',
-            style: TextStyle(fontSize: 11, color: Colors.grey),
-          ),
-          const SizedBox(height: 16),
           _buildSeccionTitle('📊 Más sesgados', 'Mayor diferencia M / T / N'),
           const SizedBox(height: 8),
           if (biasedFiltered.isEmpty)
@@ -1339,16 +1164,7 @@ class _AnalisisScreenState extends State<AnalisisScreen>
     final maxCount = _pares.first.value;
     return Column(
       children: [
-        Container(
-          width: double.infinity,
-          color: AppTheme.cardColor,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: const Text(
-            'Pares que cayeron el mismo día en distinto horario. '
-            'Cuantas más veces, más veces han coincidido en el historial.',
-            style: TextStyle(fontSize: 11, color: Colors.grey),
-          ),
-        ),
+        
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(8),
@@ -1503,11 +1319,7 @@ class _AnalisisScreenState extends State<AnalisisScreen>
               'Registra al menos 7 días para ver sugerencias',
               style: TextStyle(color: Colors.grey),
             ),
-          const SizedBox(height: 12),
-          const Text(
-            '⚠️ Basado en frecuencia histórica. La lotería es al azar — juega responsablemente.',
-            style: TextStyle(color: Colors.grey, fontSize: 10),
-          ),
+          
         ],
       ),
     );
@@ -1552,78 +1364,6 @@ class _AnalisisScreenState extends State<AnalisisScreen>
         style: const TextStyle(fontSize: 10, color: Colors.grey),
       ),
     ],
-  );
-
-  Widget _buildExplicacion() => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '📐 Probabilidades',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: AppTheme.primaryColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'Teórica (pura)',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        const Spacer(),
-                        const Text(
-                          '1.0%',
-                          style: TextStyle(
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Text(
-                      'Cada número tiene 1/100 posibilidades en cada sorteo',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 20),
-          const Text(
-            'La probabilidad empírica varía según el historial. Alta frecuencia no garantiza resultados futuros.',
-            style: TextStyle(color: Colors.grey, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(Icons.info, size: 14, color: Colors.grey),
-              const SizedBox(width: 4),
-              Text(
-                'Basado en $_totalSorteos sorteos registrados',
-                style: const TextStyle(color: Colors.grey, fontSize: 11),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
   );
 
   Widget _buildSeccionTitle(String title, String subtitle) => Column(
@@ -2972,6 +2712,1001 @@ class _AnalisisScreenState extends State<AnalisisScreen>
           ],
         ),
       ),
+    );
+  }
+
+  // ── QUEBRADOS: lógica ────────────────────────────────────────────────────────
+
+  List<int> _equivalentesDigito(int d) {
+    switch (d) {
+      case 0: return [0, 1, 7, 4];      // familia del 0/1 (sin 8)
+      case 1: return [1, 0, 7, 4];
+      case 2: return [2, 5];
+      case 3: return [3, 8];
+      case 4: return [4, 7, 1, 0];
+      case 5: return [5, 2];
+      case 6: return [6, 9];
+      case 7: return [7, 4, 1, 0];
+      case 8: return [8, 3];             // familia del 8 (separada del 0)
+      case 9: return [9, 6];
+      default: return [d];
+    }
+  }
+
+  /// Quebrados directos: aplica equivalencias a los dígitos del número
+  /// tal como es, SIN hacer la sumatoria. Genera el revés y sustituciones.
+  Map<String, List<int>> _quebradosDirectosCat(int numero) {
+    final d1 = numero ~/ 10;
+    final d2 = numero % 10;
+    final subs1 = _equivalentesDigito(d1).where((d) => d != d1).toList();
+    final subs2 = _equivalentesDigito(d2).where((d) => d != d2).toList();
+
+    void addPar(Set<int> set, int a, int b) {
+      set.add(a * 10 + b);
+      if (a != b) set.add(b * 10 + a);
+    }
+
+    final reves = <int>{};
+    final unDigito = <int>{};
+    final ambos = <int>{};
+
+    if (d1 != d2) reves.add(d2 * 10 + d1);
+
+    for (final s in subs1) { addPar(unDigito, s, d2); }
+    for (final s in subs2) { addPar(unDigito, d1, s); }
+
+    for (final s1 in subs1) {
+      for (final s2 in subs2) { addPar(ambos, s1, s2); }
+    }
+
+    reves.remove(numero);
+    unDigito.remove(numero);
+    ambos.remove(numero);
+    unDigito.removeAll(reves);
+    ambos.removeAll(reves);
+    ambos.removeAll(unDigito);
+
+    return {
+      'reves': reves.toList()..sort(),
+      'unDigito': unDigito.toList()..sort(),
+      'ambos': ambos.toList()..sort(),
+    };
+  }
+
+  /// Devuelve quebrados categorizados en 3 niveles:
+  /// - fuertes: AMBOS dígitos de la suma son sustituidos
+  /// - normales: solo UNO de los dígitos es sustituido
+  /// - basicos: ninguno sustituido (la suma y su espejo)
+  ///
+  /// Regla "010": cuando la suma termina en 0 (ej: 6+4=10 → "010"),
+  /// ese 0 final une las familias 0/1 y 8/3 (0 y 8 son equivalentes
+  /// únicamente en este caso especial).
+  Map<String, List<int>> _categorizarQuebrados(int numero) {
+    final d1 = numero ~/ 10;
+    final d2 = numero % 10;
+    final suma = d1 + d2;
+    final sa = suma ~/ 10;
+    final sb = suma % 10;
+
+    // Regla "010": sb=0 con sa>0 (suma como 10, 20...) — el 0 final
+    // equivale a toda la familia 0-1-7-4 Y también a 8-3.
+    final eqA = _equivalentesDigito(sa);
+    final eqB = (sb == 0 && sa > 0)
+        ? const [0, 1, 7, 4, 8, 3]
+        : _equivalentesDigito(sb);
+    final subsA = eqA.where((d) => d != sa).toList();
+    final subsB = eqB.where((d) => d != sb).toList();
+
+    final fuertes = <int>{};
+    final normales = <int>{};
+    final basicos = <int>{};
+
+    // Básicos: ningún dígito cambia (solo la suma y su espejo)
+    void addPar(Set<int> set, int a, int b) {
+      set.add(a * 10 + b);
+      if (a != b) set.add(b * 10 + a);
+    }
+
+    addPar(basicos, sa, sb);
+
+    // Normales: solo un dígito cambia
+    for (final a in subsA) {
+      addPar(normales, a, sb);
+    }
+    for (final b in subsB) {
+      addPar(normales, sa, b);
+    }
+
+    // Fuertes: ambos dígitos cambian
+    for (final a in subsA) {
+      for (final b in subsB) {
+        addPar(fuertes, a, b);
+      }
+    }
+
+    // Limpiar duplicados entre categorías (fuerte > normal > basico)
+    normales.removeAll(basicos);
+    fuertes
+      ..removeAll(basicos)
+      ..removeAll(normales);
+
+    // Quitar el número original de todas
+    fuertes.remove(numero);
+    normales.remove(numero);
+    basicos.remove(numero);
+
+    return {
+      'fuertes': (fuertes.toList()..sort()),
+      'normales': (normales.toList()..sort()),
+      'basicos': (basicos.toList()..sort()),
+    };
+  }
+
+  // ── TAB QUEBRADOS: UI ────────────────────────────────────────────────────────
+
+  Widget _buildTabQuebrados() {
+    final faltanMes = _numerosNoSalidosMesActual().toSet();
+    final numero = _numeroQuebradoAnalizado;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppTheme.primaryColor, Color(0xFF0a2a5e)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.goldColor.withValues(alpha: 0.2),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: TextField(
+              controller: _quebradoCtrl,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Ingresá un número (0-99)...',
+                hintStyle: const TextStyle(color: Colors.grey),
+                prefixIcon: const Icon(
+                  Icons.grid_view_rounded,
+                  color: AppTheme.goldColor,
+                ),
+                suffixIcon: _numeroQuebradoAnalizado != null
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: AppTheme.goldColor),
+                        onPressed: () {
+                          _quebradoCtrl.clear();
+                          setState(() => _numeroQuebradoAnalizado = null);
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.1),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onChanged: (val) {
+                final n = int.tryParse(val);
+                setState(() {
+                  _numeroQuebradoAnalizado =
+                      (n != null && n >= 0 && n <= 99) ? n : null;
+                });
+              },
+            ),
+          ),
+        ),
+        if (numero == null)
+          const Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.grid_view_rounded, size: 64, color: Colors.grey),
+                  SizedBox(height: 12),
+                  Text(
+                    'Ingresá un número para ver sus quebrados',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _buildQuebradosDetalle(numero, faltanMes),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ── PATRÓN HISTÓRICO DE QUEBRADO ─────────────────────────────────────────────
+
+  Set<int> _todosQuebrados(int numero) {
+    final cats = _categorizarQuebrados(numero);
+    final dir  = _quebradosDirectosCat(numero);
+    return {
+      ...cats['fuertes']!,
+      ...cats['normales']!,
+      ...cats['basicos']!,
+      ...dir['reves']!,
+      ...dir['unDigito']!,
+      ...dir['ambos']!,
+    };
+  }
+
+  /// Analiza cuántas veces tras caer [numero] su quebrado apareció
+  /// dentro de los siguientes [maxLag] sorteos.
+  Map<String, dynamic> _analizarPatronQuebrado(int numero) {
+    // Aplanar todos los sorteos en secuencia: más viejo → más reciente
+    final draws = <({DateTime fecha, String slot, int valor})>[];
+    for (final s in _sorteos.reversed) {
+      if (s.numeroManiana != null) {
+        draws.add((fecha: s.fecha, slot: 'mañana', valor: s.numeroManiana!));
+      }
+      if (s.numeroTarde != null) {
+        draws.add((fecha: s.fecha, slot: 'tarde', valor: s.numeroTarde!));
+      }
+      if (s.numeroNoche != null) {
+        draws.add((fecha: s.fecha, slot: 'noche', valor: s.numeroNoche!));
+      }
+    }
+
+    const maxLag = 9; // hasta 3 días (9 sorteos)
+    final qs = _todosQuebrados(numero);
+
+    int totalOcurrencias = 0;
+    int conQuebrado = 0;
+    int sumLag = 0;
+    final lagCount  = <int, int>{};  // lag en sorteos → frecuencia
+    final slotCount = <String, int>{};
+    final cadenas   = <Map<String, dynamic>>[];
+
+    for (int i = 0; i < draws.length; i++) {
+      if (draws[i].valor != numero) continue;
+      totalOcurrencias++;
+
+      for (int lag = 1; lag <= maxLag && i + lag < draws.length; lag++) {
+        final next = draws[i + lag];
+        if (!qs.contains(next.valor)) continue;
+        conQuebrado++;
+        sumLag += lag;
+        lagCount[lag] = (lagCount[lag] ?? 0) + 1;
+        slotCount[next.slot] = (slotCount[next.slot] ?? 0) + 1;
+        cadenas.add({
+          'fechaOrigen': draws[i].fecha,
+          'slotOrigen': draws[i].slot,
+          'fechaQ': next.fecha,
+          'slotQ': next.slot,
+          'quebrado': next.valor,
+          'lag': lag,
+        });
+        break; // solo primer quebrado tras cada ocurrencia
+      }
+    }
+
+    return {
+      'total': totalOcurrencias,
+      'conQuebrado': conQuebrado,
+      'avgLag': conQuebrado > 0 ? sumLag / conQuebrado : 0.0,
+      'lagCount': lagCount,
+      'slotCount': slotCount,
+      'cadenas': cadenas.reversed.take(6).toList(),
+    };
+  }
+
+  // ── TOP 5 CANDIDATOS ─────────────────────────────────────────────────────────
+
+  String _categoriaLabel(int n, Map<String, List<int>> cats, Map<String, List<int>> dir) {
+    if (cats['fuertes']!.contains(n)) return 'Fuerte';
+    if (dir['reves']!.contains(n)) return 'Dir. revés';
+    if (dir['unDigito']!.contains(n)) return 'Directo';
+    if (cats['normales']!.contains(n)) return 'Normal';
+    if (dir['ambos']!.contains(n)) return 'Dir. ambos';
+    return 'Base';
+  }
+
+  List<({int numero, int score, String categoria, int vecesTraX, int diasSin, int freqGen, bool mismoGrupo})>
+      _top5Candidatos(int numero) {
+    final cats = _categorizarQuebrados(numero);
+    final dir  = _quebradosDirectosCat(numero);
+
+    // Peso base por categoría
+    final pesos = <int, double>{};
+    for (final n in cats['fuertes']!)  { pesos[n] = (pesos[n] ?? 0) + 10; }
+    for (final n in dir['reves']!)     { pesos[n] = (pesos[n] ?? 0) + 9; }
+    for (final n in dir['unDigito']!)  { pesos[n] = (pesos[n] ?? 0) + 8; }
+    for (final n in cats['normales']!) { pesos[n] = (pesos[n] ?? 0) + 6; }
+    for (final n in dir['ambos']!)     { pesos[n] = (pesos[n] ?? 0) + 5; }
+    for (final n in cats['basicos']!)  { pesos[n] = (pesos[n] ?? 0) + 4; }
+
+    // Historial: cuántas veces cada candidato apareció dentro de 9 sorteos tras `numero`
+    final draws = <int>[];
+    for (final s in _sorteos.reversed) {
+      if (s.numeroManiana != null) draws.add(s.numeroManiana!);
+      if (s.numeroTarde   != null) draws.add(s.numeroTarde!);
+      if (s.numeroNoche   != null) draws.add(s.numeroNoche!);
+    }
+    final vecesTraX = <int, int>{};
+    for (int i = 0; i < draws.length; i++) {
+      if (draws[i] != numero) continue;
+      for (int lag = 1; lag <= 9 && i + lag < draws.length; lag++) {
+        final next = draws[i + lag];
+        if (pesos.containsKey(next)) {
+          vecesTraX[next] = (vecesTraX[next] ?? 0) + 1;
+          break;
+        }
+      }
+    }
+
+    // Grupo semántico del número analizado
+    final grupoOrigen = grupoDeNumero(numero);
+
+    // Score final
+    final scored = pesos.entries.map((e) {
+      final n         = e.key;
+      final cat       = e.value;
+      final freq      = _allStats?[n]?.frecuencia ?? 0;
+      final dias      = _allStats?[n]?.diasSinSalir() ?? 0;
+      final after     = vecesTraX[n] ?? 0;
+      final mismoGrupo = grupoOrigen != null && grupoDeNumero(n) == grupoOrigen;
+      final score = cat
+          + after * 3
+          + freq * 0.2
+          + (dias > 7  ? 3.0 : 0)
+          + (dias > 14 ? 2.0 : 0)
+          + (dias > 21 ? 2.0 : 0)
+          + (mismoGrupo ? 4.0 : 0);   // bonus semántico
+      return (
+        numero: n,
+        score: score.round(),
+        categoria: _categoriaLabel(n, cats, dir),
+        vecesTraX: after,
+        diasSin: dias,
+        freqGen: freq,
+        mismoGrupo: mismoGrupo,
+      );
+    }).toList()
+      ..sort((a, b) => b.score.compareTo(a.score));
+
+    return scored.take(5).toList();
+  }
+
+  // ── HELPERS QUEBRADOS ────────────────────────────────────────────────────────
+
+  int _frecPeriodo(int n) {
+    if (_qPeriodo == 'historico') return _allStats?[n]?.frecuencia ?? 0;
+    final ahora = DateTime.now();
+    return _sorteos.fold(0, (acc, s) {
+      final ok = _qPeriodo == 'mes'
+          ? s.fecha.year == ahora.year && s.fecha.month == ahora.month
+          : s.fecha.year == ahora.year;
+      if (!ok) return acc;
+      return acc +
+          (s.numeroManiana == n ? 1 : 0) +
+          (s.numeroTarde == n ? 1 : 0) +
+          (s.numeroNoche == n ? 1 : 0);
+    });
+  }
+
+  List<int> _ordenarPorFrec(List<int> nums) =>
+      [...nums]..sort((a, b) => _frecPeriodo(b).compareTo(_frecPeriodo(a)));
+
+  Widget _buildPeriodoSelector() {
+    const opciones = [('mes', 'Mes'), ('anio', 'Año'), ('historico', 'Total')];
+    return Row(
+      children: [
+        const Text('Ordenar por: ', style: TextStyle(fontSize: 10, color: Colors.grey)),
+        ...opciones.map((p) {
+          final sel = _qPeriodo == p.$1;
+          return Padding(
+            padding: const EdgeInsets.only(right: 5),
+            child: GestureDetector(
+              onTap: () => setState(() => _qPeriodo = p.$1),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: sel ? AppTheme.goldColor.withValues(alpha: 0.2) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: sel ? AppTheme.goldColor : Colors.grey.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  p.$2,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: sel ? AppTheme.goldColor : Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildPatronContenido(Map<String, dynamic> patron, int numero) {
+    final total     = patron['total']      as int;
+    final conQ      = patron['conQuebrado'] as int;
+    final avgLag    = patron['avgLag']      as double;
+    final slotCount = patron['slotCount']   as Map<String, int>;
+    final lagCount  = patron['lagCount']    as Map<int, int>;
+    final cadenas   = patron['cadenas']     as List<Map<String, dynamic>>;
+    final pct       = total > 0 ? (conQ / total * 100).round() : 0;
+
+    String slotTop = '-';
+    if (slotCount.isNotEmpty) {
+      slotTop = slotCount.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    }
+    int lagTop = 0;
+    if (lagCount.isNotEmpty) {
+      lagTop = lagCount.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    }
+    final lagLabel = lagTop == 0 ? '-'
+        : lagTop == 1 ? 'sorteo siguiente'
+        : lagTop <= 3 ? 'mismo día'
+        : lagTop <= 6 ? 'al día siguiente'
+        : 'a los 2-3 días';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildStatChip('Cayó', '$total veces', Colors.teal),
+            _buildStatChip('Con quebrado', '$conQ ($pct%)', conQ > 0 ? Colors.green : Colors.grey),
+            _buildStatChip('Lag promedio', '${avgLag.toStringAsFixed(1)} sorteos', Colors.blue),
+            _buildStatChip('Más frecuente', lagLabel, Colors.orange),
+            _buildStatChip('Turno habitual', slotTop, Colors.purple),
+          ],
+        ),
+        if (cadenas.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Text('Últimas cadenas:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+          const SizedBox(height: 6),
+          ...cadenas.map((c) {
+            final fO  = c['fechaOrigen'] as DateTime;
+            final fQ  = c['fechaQ']      as DateTime;
+            final lag = c['lag']         as int;
+            final q   = c['quebrado']    as int;
+            final sO  = c['slotOrigen']  as String;
+            final sQ  = c['slotQ']       as String;
+            final mismodia = fO.year == fQ.year && fO.month == fQ.month && fO.day == fQ.day;
+            final cuando = mismodia ? 'mismo día' : '+${fQ.difference(fO).inDays}d';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    '${fO.day.toString().padLeft(2, '0')}/${fO.month.toString().padLeft(2, '0')}',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(numero.toString().padLeft(2, '0'),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.goldColor)),
+                  Text(' ($sO)', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Icon(Icons.arrow_forward, size: 12, color: Colors.grey),
+                  ),
+                  Text(q.toString().padLeft(2, '0'),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.teal)),
+                  const SizedBox(width: 3),
+                  Text(significadoCorto(q),
+                      style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                  Text(' ($sQ)', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text('$cuando · lag $lag',
+                        style: const TextStyle(fontSize: 9, color: Colors.teal)),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCardQ({
+    required String titulo,
+    required String descripcion,
+    required Color color,
+    required int count,
+    required Widget contenido,
+  }) {
+    return Card(
+      color: color.withValues(alpha: 0.07),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(titulo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('$count', style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(descripcion, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+            const SizedBox(height: 10),
+            contenido,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuebradosDetalle(int numero, Set<int> faltanMes) {
+    final d1 = numero ~/ 10;
+    final d2 = numero % 10;
+    final suma = d1 + d2;
+    final directo    = _quebradosDirectosCat(numero);
+    final patron     = _analizarPatronQuebrado(numero);
+    final candidatos = _top5Candidatos(numero);
+    final cats = _categorizarQuebrados(numero);
+    final fuertes  = _ordenarPorFrec(cats['fuertes']!);
+    final normales = _ordenarPorFrec(cats['normales']!);
+    final basicos  = cats['basicos']!;
+    final todos = [...fuertes, ...normales, ...basicos];
+    final noSalieronMes = todos.where((n) => faltanMes.contains(n)).length;
+
+    // Básicos: separar derecho (suma exacta) y revés
+    final puntoStr = suma.toString().padLeft(2, '0');
+    final saB = suma ~/ 10;
+    final sbB = suma % 10;
+    final derecho = saB * 10 + sbB;
+    final reves   = sbB * 10 + saB;
+    final basicosDerecho = basicos.where((n) => n == derecho).toList();
+    final basicosReves   = basicos.where((n) => n == reves && n != derecho).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Cabecera ─────────────────────────────────────
+        Card(
+          color: AppTheme.cardColor,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppTheme.goldColor, AppTheme.orangeColor],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      numero.toString().padLeft(2, '0'),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$d1 + $d2 = $suma  →  punto $puntoStr',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${fuertes.length} fuertes  •  $noSalieronMes sin salir este mes',
+                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Top 5 Candidatos ──────────────────────────────
+        Card(
+          color: AppTheme.goldColor.withValues(alpha: 0.07),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: AppTheme.goldColor.withValues(alpha: 0.4)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Text('🎯 Top 5 candidatos', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    SizedBox(width: 8),
+                    Text('scored por categoría · historial · días sin salir', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ...candidatos.asMap().entries.map((e) {
+                  final rank = e.key + 1;
+                  final c    = e.value;
+                  final rankColor = rank == 1
+                      ? AppTheme.goldColor
+                      : rank == 2
+                          ? Colors.grey.shade400
+                          : rank == 3
+                              ? Colors.brown.shade300
+                              : Colors.grey.shade600;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 7),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          child: Text(
+                            '$rank',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: rankColor),
+                          ),
+                        ),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: rankColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: rankColor.withValues(alpha: 0.6)),
+                          ),
+                          child: Center(
+                            child: Text(
+                              c.numero.toString().padLeft(2, '0'),
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: rankColor),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                significadoCorto(c.numero),
+                                style: const TextStyle(fontSize: 11),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    '${c.categoria}  •  ${c.freqGen}x  •  ${c.diasSin}d sin salir',
+                                    style: const TextStyle(fontSize: 9, color: Colors.grey),
+                                  ),
+                                  if (c.mismoGrupo) ...[
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: Colors.teal.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        grupoDeNumero(c.numero) ?? '',
+                                        style: const TextStyle(fontSize: 8, color: Colors.teal),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('score ${c.score}', style: TextStyle(fontSize: 9, color: rankColor)),
+                            if (c.vecesTraX > 0)
+                              Text(
+                                '${c.vecesTraX}x tras ${numero.toString().padLeft(2, '0')}',
+                                style: const TextStyle(fontSize: 9, color: Colors.teal),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Leyenda ───────────────────────────────────────
+        Row(
+          children: [
+            _buildLeyendaChip(Colors.red, 'No salió este mes'),
+            const SizedBox(width: 16),
+            _buildLeyendaChip(Colors.green, 'Ya salió este mes'),
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Selector de período ───────────────────────────
+        _buildPeriodoSelector(),
+
+        const SizedBox(height: 12),
+
+        // 1 ── Fuertes ─────────────────────────────────────
+        _buildCardQ(
+          titulo: '🔥 Quebrados Fuertes',
+          descripcion: 'Ambos dígitos del punto sustituidos — mayor probabilidad',
+          color: Colors.orange,
+          count: fuertes.length,
+          contenido: _buildGrillaNiveles(fuertes, faltanMes, grande: true),
+        ),
+
+        const SizedBox(height: 10),
+
+        // 2 ── Quebrado directo ────────────────────────────
+        _buildCardQ(
+          titulo: '🔀 Quebrado directo',
+          descripcion: 'Equivalencias sobre los dígitos del número tal como es (sin sumar)',
+          color: Colors.purple,
+          count: directo['reves']!.length + directo['unDigito']!.length + directo['ambos']!.length,
+          contenido: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (directo['reves']!.isNotEmpty) ...[
+                const Text('Revés:', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                const SizedBox(height: 6),
+                _buildGrillaNiveles(directo['reves']!, faltanMes, grande: false),
+                const SizedBox(height: 10),
+              ],
+              if (directo['unDigito']!.isNotEmpty) ...[
+                const Text('Un dígito sustituido:', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                const SizedBox(height: 6),
+                _buildGrillaNiveles(directo['unDigito']!, faltanMes, grande: false),
+                const SizedBox(height: 10),
+              ],
+              if (directo['ambos']!.isNotEmpty) ...[
+                const Text('Ambos dígitos sustituidos:', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                const SizedBox(height: 6),
+                _buildGrillaNiveles(directo['ambos']!, faltanMes, grande: false),
+              ],
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // 3 ── Normales ────────────────────────────────────
+        _buildCardQ(
+          titulo: '⚡ Quebrados Normales',
+          descripcion: 'Un dígito del punto sustituido',
+          color: Colors.blue,
+          count: normales.length,
+          contenido: _buildGrillaNiveles(normales, faltanMes, grande: false),
+        ),
+
+        const SizedBox(height: 10),
+
+        // 4 ── Punto base ──────────────────────────────────
+        _buildCardQ(
+          titulo: '🔵 Punto base',
+          descripcion: 'La suma exacta (derecho) y su espejo (revés)',
+          color: Colors.grey,
+          count: basicos.length,
+          contenido: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (basicosDerecho.isNotEmpty) ...[
+                const Text('Derecho:', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                const SizedBox(height: 6),
+                _buildGrillaNiveles(basicosDerecho, faltanMes, grande: false),
+                const SizedBox(height: 10),
+              ],
+              if (basicosReves.isNotEmpty) ...[
+                const Text('Revés:', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                const SizedBox(height: 6),
+                _buildGrillaNiveles(basicosReves, faltanMes, grande: false),
+              ],
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // 5 ── Grupo semántico ────────────────────────────
+        if (grupoDeNumero(numero) != null) ...[
+          _buildCardQ(
+            titulo: '🌐 Grupo semántico — ${grupoDeNumero(numero)}',
+            descripcion: 'Números del mismo grupo simbólico del libro de sueños',
+            color: Colors.teal,
+            count: companerosSemanticos(numero).length,
+            contenido: _buildGrillaNiveles(
+              _ordenarPorFrec(companerosSemanticos(numero)),
+              faltanMes,
+              grande: false,
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+
+        // 6 ── Patrón histórico ────────────────────────────
+        _buildCardQ(
+          titulo: '📊 Patrón histórico',
+          descripcion: 'Qué tan seguido cae el quebrado después de este número',
+          color: Colors.teal,
+          count: patron['total'] as int,
+          contenido: _buildPatronContenido(patron, numero),
+        ),
+
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildGrillaNiveles(
+    List<int> numeros,
+    Set<int> faltanMes, {
+    required bool grande,
+  }) {
+    if (numeros.isEmpty) {
+      return const Text(
+        'Sin resultados',
+        style: TextStyle(color: Colors.grey, fontSize: 12),
+      );
+    }
+    final size = grande ? 84.0 : 72.0;
+    final fontSize = grande ? 22.0 : 18.0;
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: numeros.map((q) {
+        final noSalio = faltanMes.contains(q);
+        final stats = _allStats?[q];
+        final dias = stats?.diasSinSalir() ?? 0;
+        final freq = stats?.frecuencia ?? 0;
+        final sig = significadoCorto(q);
+
+        return Container(
+          width: size,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          decoration: BoxDecoration(
+            color: noSalio
+                ? Colors.red.withValues(alpha: 0.15)
+                : Colors.green.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: noSalio
+                  ? Colors.red.withValues(alpha: 0.7)
+                  : Colors.green.withValues(alpha: 0.5),
+              width: grande ? 2.0 : 1.5,
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(
+                q.toString().padLeft(2, '0'),
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.bold,
+                  color: noSalio ? Colors.red : Colors.green,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sig,
+                style: const TextStyle(fontSize: 8, color: Colors.grey),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                noSalio ? '${dias}d sin salir' : 'salió',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: noSalio
+                      ? Colors.red.withValues(alpha: 0.8)
+                      : Colors.green.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${freq}x',
+                style: const TextStyle(fontSize: 9, color: Colors.grey),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildStatChip(String titulo, String valor, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(titulo, style: TextStyle(fontSize: 9, color: color.withValues(alpha: 0.8))),
+          const SizedBox(height: 2),
+          Text(valor, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeyendaChip(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      ],
     );
   }
 
