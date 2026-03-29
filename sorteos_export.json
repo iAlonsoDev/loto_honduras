@@ -1,4 +1,1829 @@
 {
+  "2022-01-01": {
+    "maniana": 31,
+    "tarde": 28,
+    "noche": 70
+  },
+  "2022-01-02": {
+    "maniana": 5,
+    "tarde": 5,
+    "noche": 56
+  },
+  "2022-01-03": {
+    "maniana": 24,
+    "tarde": 24,
+    "noche": 55
+  },
+  "2022-01-04": {
+    "maniana": 17,
+    "tarde": 9,
+    "noche": 85
+  },
+  "2022-01-05": {
+    "maniana": 20,
+    "tarde": 65,
+    "noche": 49
+  },
+  "2022-01-06": {
+    "maniana": 94,
+    "tarde": 11,
+    "noche": 74
+  },
+  "2022-01-07": {
+    "maniana": 98,
+    "tarde": 25,
+    "noche": 37
+  },
+  "2022-01-08": {
+    "maniana": 1,
+    "tarde": 84,
+    "noche": 51
+  },
+  "2022-01-09": {
+    "maniana": 20,
+    "tarde": 47,
+    "noche": 14
+  },
+  "2022-01-10": {
+    "maniana": 19,
+    "tarde": 17,
+    "noche": 5
+  },
+  "2022-01-11": {
+    "maniana": 62,
+    "tarde": 39,
+    "noche": 11
+  },
+  "2022-01-12": {
+    "maniana": 67,
+    "tarde": 55,
+    "noche": 61
+  },
+  "2022-01-13": {
+    "maniana": 93,
+    "tarde": 54,
+    "noche": 69
+  },
+  "2022-01-14": {
+    "maniana": 26,
+    "tarde": 81,
+    "noche": 97
+  },
+  "2022-01-15": {
+    "maniana": 13,
+    "tarde": 82,
+    "noche": 89
+  },
+  "2022-01-16": {
+    "maniana": 72,
+    "tarde": 74,
+    "noche": 43
+  },
+  "2022-01-17": {
+    "maniana": 75,
+    "tarde": 64,
+    "noche": 2
+  },
+  "2022-01-18": {
+    "maniana": 57,
+    "tarde": 27,
+    "noche": 27
+  },
+  "2022-01-19": {
+    "maniana": 85,
+    "tarde": 26,
+    "noche": 87
+  },
+  "2022-01-20": {
+    "maniana": 67,
+    "tarde": 43,
+    "noche": 31
+  },
+  "2022-01-21": {
+    "maniana": 18,
+    "tarde": 51,
+    "noche": 49
+  },
+  "2022-01-22": {
+    "maniana": 44,
+    "tarde": 33,
+    "noche": 42
+  },
+  "2022-01-23": {
+    "maniana": 90,
+    "tarde": 31,
+    "noche": 26
+  },
+  "2022-01-24": {
+    "maniana": 25,
+    "tarde": 80,
+    "noche": 43
+  },
+  "2022-01-25": {
+    "maniana": 47,
+    "tarde": 38,
+    "noche": 76
+  },
+  "2022-01-26": {
+    "maniana": 10,
+    "tarde": 62,
+    "noche": 8
+  },
+  "2022-01-27": {
+    "maniana": 33,
+    "tarde": 53,
+    "noche": 83
+  },
+  "2022-01-28": {
+    "maniana": 26,
+    "tarde": 68,
+    "noche": 45
+  },
+  "2022-01-29": {
+    "maniana": 9,
+    "tarde": 20,
+    "noche": 79
+  },
+  "2022-01-30": {
+    "maniana": 58,
+    "tarde": 51,
+    "noche": 49
+  },
+  "2022-01-31": {
+    "maniana": 53,
+    "tarde": 41,
+    "noche": 93
+  },
+  "2022-02-01": {
+    "maniana": 2,
+    "tarde": 2,
+    "noche": 4
+  },
+  "2022-02-02": {
+    "maniana": 53,
+    "tarde": 23,
+    "noche": 51
+  },
+  "2022-02-03": {
+    "maniana": 83,
+    "tarde": 53,
+    "noche": 97
+  },
+  "2022-02-04": {
+    "maniana": 89,
+    "tarde": 54,
+    "noche": 95
+  },
+  "2022-02-05": {
+    "maniana": 97,
+    "tarde": 27,
+    "noche": 29
+  },
+  "2022-02-06": {
+    "maniana": 45,
+    "tarde": 66,
+    "noche": 12
+  },
+  "2022-02-07": {
+    "maniana": 71,
+    "tarde": 25,
+    "noche": 41
+  },
+  "2022-02-08": {
+    "maniana": 53,
+    "tarde": 35,
+    "noche": 68
+  },
+  "2022-02-09": {
+    "maniana": 7,
+    "tarde": 40,
+    "noche": 22
+  },
+  "2022-02-10": {
+    "maniana": 54,
+    "tarde": 24,
+    "noche": 68
+  },
+  "2022-02-11": {
+    "maniana": 81,
+    "tarde": 20,
+    "noche": 20
+  },
+  "2022-02-12": {
+    "maniana": 61,
+    "tarde": 68,
+    "noche": 2
+  },
+  "2022-02-13": {
+    "maniana": 79,
+    "tarde": 77,
+    "noche": 0
+  },
+  "2022-02-14": {
+    "maniana": 41,
+    "tarde": 72,
+    "noche": 86
+  },
+  "2022-02-15": {
+    "maniana": 40,
+    "tarde": 16,
+    "noche": 18
+  },
+  "2022-02-16": {
+    "maniana": 23,
+    "tarde": 81,
+    "noche": 22
+  },
+  "2022-02-17": {
+    "maniana": 80,
+    "tarde": 20,
+    "noche": 10
+  },
+  "2022-02-18": {
+    "maniana": 63,
+    "tarde": 30,
+    "noche": 23
+  },
+  "2022-02-19": {
+    "maniana": 58,
+    "tarde": 58,
+    "noche": 82
+  },
+  "2022-02-20": {
+    "maniana": 49,
+    "tarde": 95,
+    "noche": 29
+  },
+  "2022-02-21": {
+    "maniana": 72,
+    "tarde": 59,
+    "noche": 68
+  },
+  "2022-02-22": {
+    "maniana": 70,
+    "tarde": 72,
+    "noche": 7
+  },
+  "2022-02-23": {
+    "maniana": 83,
+    "tarde": 49,
+    "noche": 60
+  },
+  "2022-02-24": {
+    "maniana": 87,
+    "tarde": 59,
+    "noche": 74
+  },
+  "2022-02-25": {
+    "maniana": 10,
+    "tarde": 4,
+    "noche": 79
+  },
+  "2022-02-26": {
+    "maniana": 52,
+    "tarde": 5,
+    "noche": 25
+  },
+  "2022-02-27": {
+    "maniana": 2,
+    "tarde": 4,
+    "noche": 80
+  },
+  "2022-02-28": {
+    "maniana": 6,
+    "tarde": 37,
+    "noche": 46
+  },
+  "2022-03-01": {
+    "maniana": 63,
+    "tarde": 6,
+    "noche": 28
+  },
+  "2022-03-02": {
+    "maniana": 38,
+    "tarde": 17,
+    "noche": 15
+  },
+  "2022-03-03": {
+    "maniana": 53,
+    "tarde": 59,
+    "noche": 67
+  },
+  "2022-03-04": {
+    "maniana": 70,
+    "tarde": 33,
+    "noche": 20
+  },
+  "2022-03-05": {
+    "maniana": 6,
+    "tarde": 41,
+    "noche": 11
+  },
+  "2022-03-06": {
+    "maniana": 49,
+    "tarde": 42,
+    "noche": 9
+  },
+  "2022-03-07": {
+    "maniana": 81,
+    "tarde": 13,
+    "noche": 65
+  },
+  "2022-03-08": {
+    "maniana": 74,
+    "tarde": 56,
+    "noche": 40
+  },
+  "2022-03-09": {
+    "maniana": 87,
+    "tarde": 80,
+    "noche": 78
+  },
+  "2022-03-10": {
+    "maniana": 30,
+    "tarde": 68,
+    "noche": 55
+  },
+  "2022-03-11": {
+    "maniana": 12,
+    "tarde": 67,
+    "noche": 90
+  },
+  "2022-03-12": {
+    "maniana": 81,
+    "tarde": 10,
+    "noche": 69
+  },
+  "2022-03-13": {
+    "maniana": 62,
+    "tarde": 95,
+    "noche": 51
+  },
+  "2022-03-14": {
+    "maniana": 49,
+    "tarde": 53,
+    "noche": 30
+  },
+  "2022-03-15": {
+    "maniana": 99,
+    "tarde": 13,
+    "noche": 50
+  },
+  "2022-03-16": {
+    "maniana": 14,
+    "tarde": 92,
+    "noche": 36
+  },
+  "2022-03-17": {
+    "maniana": 6,
+    "tarde": 8,
+    "noche": 51
+  },
+  "2022-03-18": {
+    "maniana": 69,
+    "tarde": 63,
+    "noche": 93
+  },
+  "2022-03-19": {
+    "maniana": 89,
+    "tarde": 99,
+    "noche": 50
+  },
+  "2022-03-20": {
+    "maniana": 19,
+    "tarde": 66,
+    "noche": 96
+  },
+  "2022-03-21": {
+    "maniana": 15,
+    "tarde": 12,
+    "noche": 59
+  },
+  "2022-03-22": {
+    "maniana": 5,
+    "tarde": 99,
+    "noche": 63
+  },
+  "2022-03-23": {
+    "maniana": 84,
+    "tarde": 1,
+    "noche": 36
+  },
+  "2022-03-24": {
+    "maniana": 82,
+    "tarde": 52,
+    "noche": 2
+  },
+  "2022-03-25": {
+    "maniana": 96,
+    "tarde": 61,
+    "noche": 92
+  },
+  "2022-03-26": {
+    "maniana": 85,
+    "tarde": 25,
+    "noche": 35
+  },
+  "2022-03-27": {
+    "maniana": 18,
+    "tarde": 2,
+    "noche": 34
+  },
+  "2022-03-28": {
+    "maniana": 78,
+    "tarde": 48,
+    "noche": 63
+  },
+  "2022-03-29": {
+    "maniana": 44,
+    "tarde": 92,
+    "noche": 33
+  },
+  "2022-03-30": {
+    "maniana": 98,
+    "tarde": 74,
+    "noche": 86
+  },
+  "2022-03-31": {
+    "maniana": 28,
+    "tarde": 20,
+    "noche": 89
+  },
+  "2022-04-01": {
+    "maniana": 74,
+    "tarde": 61,
+    "noche": 39
+  },
+  "2022-04-02": {
+    "maniana": 47,
+    "tarde": 29,
+    "noche": 20
+  },
+  "2022-04-03": {
+    "maniana": 82,
+    "tarde": 84,
+    "noche": 16
+  },
+  "2022-04-04": {
+    "maniana": 77,
+    "tarde": 76,
+    "noche": 40
+  },
+  "2022-04-05": {
+    "maniana": 33,
+    "tarde": 94,
+    "noche": 72
+  },
+  "2022-04-06": {
+    "maniana": 31,
+    "tarde": 15,
+    "noche": 71
+  },
+  "2022-04-07": {
+    "maniana": 68,
+    "tarde": 33,
+    "noche": 30
+  },
+  "2022-04-08": {
+    "maniana": 39,
+    "tarde": 3,
+    "noche": 78
+  },
+  "2022-04-09": {
+    "maniana": 18,
+    "tarde": 74,
+    "noche": 0
+  },
+  "2022-04-10": {
+    "maniana": 97,
+    "tarde": 36,
+    "noche": 49
+  },
+  "2022-04-11": {
+    "maniana": 4,
+    "tarde": 22,
+    "noche": 28
+  },
+  "2022-04-12": {
+    "maniana": 83,
+    "tarde": 1,
+    "noche": 37
+  },
+  "2022-04-13": {
+    "maniana": 93,
+    "tarde": 73,
+    "noche": 1
+  },
+  "2022-04-14": {
+    "maniana": 7,
+    "tarde": 59,
+    "noche": 31
+  },
+  "2022-04-15": {
+    "maniana": 95,
+    "tarde": 31,
+    "noche": 97
+  },
+  "2022-04-16": {
+    "maniana": 5,
+    "tarde": 51,
+    "noche": 91
+  },
+  "2022-04-17": {
+    "maniana": 48,
+    "tarde": 58,
+    "noche": 60
+  },
+  "2022-04-18": {
+    "maniana": 24,
+    "tarde": 63,
+    "noche": 51
+  },
+  "2022-04-19": {
+    "maniana": 39,
+    "tarde": 55,
+    "noche": 16
+  },
+  "2022-04-20": {
+    "maniana": 54,
+    "tarde": 86,
+    "noche": 92
+  },
+  "2022-04-21": {
+    "maniana": 38,
+    "tarde": 15,
+    "noche": 21
+  },
+  "2022-04-22": {
+    "maniana": 22,
+    "tarde": 47,
+    "noche": 12
+  },
+  "2022-04-23": {
+    "maniana": 98,
+    "tarde": 59,
+    "noche": 54
+  },
+  "2022-04-24": {
+    "maniana": 4,
+    "tarde": 23,
+    "noche": 49
+  },
+  "2022-04-25": {
+    "maniana": 64,
+    "tarde": 19,
+    "noche": 9
+  },
+  "2022-04-26": {
+    "maniana": 80,
+    "tarde": 55,
+    "noche": 65
+  },
+  "2022-04-27": {
+    "maniana": 81,
+    "tarde": 57,
+    "noche": 71
+  },
+  "2022-04-28": {
+    "maniana": 8,
+    "tarde": 69,
+    "noche": 68
+  },
+  "2022-04-29": {
+    "maniana": 37,
+    "tarde": 8,
+    "noche": 57
+  },
+  "2022-04-30": {
+    "maniana": 18,
+    "tarde": 28,
+    "noche": 11
+  },
+  "2022-05-01": {
+    "maniana": 94,
+    "tarde": 44,
+    "noche": 62
+  },
+  "2022-05-02": {
+    "maniana": 47,
+    "tarde": 75,
+    "noche": 62
+  },
+  "2022-05-03": {
+    "maniana": 2,
+    "tarde": 25,
+    "noche": 2
+  },
+  "2022-05-04": {
+    "maniana": 8,
+    "tarde": 79,
+    "noche": 10
+  },
+  "2022-05-05": {
+    "maniana": 14,
+    "tarde": 70,
+    "noche": 71
+  },
+  "2022-05-06": {
+    "maniana": 76,
+    "tarde": 73,
+    "noche": 98
+  },
+  "2022-05-07": {
+    "maniana": 65,
+    "tarde": 2,
+    "noche": 75
+  },
+  "2022-05-08": {
+    "maniana": 64,
+    "tarde": 92,
+    "noche": 45
+  },
+  "2022-05-09": {
+    "maniana": 74,
+    "tarde": 41,
+    "noche": 84
+  },
+  "2022-05-10": {
+    "maniana": 95,
+    "tarde": 69,
+    "noche": 98
+  },
+  "2022-05-11": {
+    "maniana": 55,
+    "tarde": 9,
+    "noche": 64
+  },
+  "2022-05-12": {
+    "maniana": 55,
+    "tarde": 22,
+    "noche": 84
+  },
+  "2022-05-13": {
+    "maniana": 2,
+    "tarde": 39,
+    "noche": 39
+  },
+  "2022-05-14": {
+    "maniana": 46,
+    "tarde": 47,
+    "noche": 78
+  },
+  "2022-05-15": {
+    "maniana": 65,
+    "tarde": 16,
+    "noche": 16
+  },
+  "2022-05-16": {
+    "maniana": 6,
+    "tarde": 66,
+    "noche": 91
+  },
+  "2022-05-17": {
+    "maniana": 9,
+    "tarde": 78,
+    "noche": 48
+  },
+  "2022-05-18": {
+    "maniana": 75,
+    "tarde": 1,
+    "noche": 50
+  },
+  "2022-05-19": {
+    "maniana": 57,
+    "tarde": 19,
+    "noche": 14
+  },
+  "2022-05-20": {
+    "maniana": 22,
+    "tarde": 31,
+    "noche": 58
+  },
+  "2022-05-21": {
+    "maniana": 81,
+    "tarde": 89,
+    "noche": 6
+  },
+  "2022-05-22": {
+    "maniana": 94,
+    "tarde": 22,
+    "noche": 78
+  },
+  "2022-05-23": {
+    "maniana": 77,
+    "tarde": 60,
+    "noche": 22
+  },
+  "2022-05-24": {
+    "maniana": 36,
+    "tarde": 97,
+    "noche": 97
+  },
+  "2022-05-25": {
+    "maniana": 33,
+    "tarde": 0,
+    "noche": 51
+  },
+  "2022-05-26": {
+    "maniana": 91,
+    "tarde": 12,
+    "noche": 7
+  },
+  "2022-05-27": {
+    "maniana": 36,
+    "tarde": 84,
+    "noche": 74
+  },
+  "2022-05-28": {
+    "maniana": 55,
+    "tarde": 69,
+    "noche": 13
+  },
+  "2022-05-29": {
+    "maniana": 64,
+    "tarde": 61,
+    "noche": 9
+  },
+  "2022-05-30": {
+    "maniana": 84,
+    "tarde": 1,
+    "noche": 92
+  },
+  "2022-05-31": {
+    "maniana": 77,
+    "tarde": 61,
+    "noche": 83
+  },
+  "2022-06-01": {
+    "maniana": 4,
+    "tarde": 6,
+    "noche": 26
+  },
+  "2022-06-02": {
+    "maniana": 82,
+    "tarde": 44,
+    "noche": 11
+  },
+  "2022-06-03": {
+    "maniana": 53,
+    "tarde": 0,
+    "noche": 78
+  },
+  "2022-06-04": {
+    "maniana": 26,
+    "tarde": 53,
+    "noche": 32
+  },
+  "2022-06-05": {
+    "maniana": 53,
+    "tarde": 55,
+    "noche": 98
+  },
+  "2022-06-06": {
+    "maniana": 8,
+    "tarde": 99,
+    "noche": 6
+  },
+  "2022-06-07": {
+    "maniana": 77,
+    "tarde": 92,
+    "noche": 45
+  },
+  "2022-06-08": {
+    "maniana": 49,
+    "tarde": 81,
+    "noche": 11
+  },
+  "2022-06-09": {
+    "maniana": 84,
+    "tarde": 30,
+    "noche": 20
+  },
+  "2022-06-10": {
+    "maniana": 13,
+    "tarde": 28,
+    "noche": 55
+  },
+  "2022-06-11": {
+    "maniana": 86,
+    "tarde": 0,
+    "noche": 39
+  },
+  "2022-06-12": {
+    "maniana": 9,
+    "tarde": 24,
+    "noche": 6
+  },
+  "2022-06-13": {
+    "maniana": 36,
+    "tarde": 47,
+    "noche": 31
+  },
+  "2022-06-14": {
+    "maniana": 46,
+    "tarde": 41,
+    "noche": 75
+  },
+  "2022-06-15": {
+    "maniana": 14,
+    "tarde": 95,
+    "noche": 51
+  },
+  "2022-06-16": {
+    "maniana": 74,
+    "tarde": 64,
+    "noche": 79
+  },
+  "2022-06-17": {
+    "maniana": 23,
+    "tarde": 15,
+    "noche": 65
+  },
+  "2022-06-18": {
+    "maniana": 57,
+    "tarde": 30,
+    "noche": 64
+  },
+  "2022-06-19": {
+    "maniana": 53,
+    "tarde": 26,
+    "noche": 50
+  },
+  "2022-06-20": {
+    "maniana": 55,
+    "tarde": 79,
+    "noche": 54
+  },
+  "2022-06-21": {
+    "maniana": 69,
+    "tarde": 34,
+    "noche": 26
+  },
+  "2022-06-22": {
+    "maniana": 92,
+    "tarde": 32,
+    "noche": 95
+  },
+  "2022-06-23": {
+    "maniana": 89,
+    "tarde": 82,
+    "noche": 61
+  },
+  "2022-06-24": {
+    "maniana": 73,
+    "tarde": 20,
+    "noche": 13
+  },
+  "2022-06-25": {
+    "maniana": 49,
+    "tarde": 44,
+    "noche": 43
+  },
+  "2022-06-26": {
+    "maniana": 54,
+    "tarde": 88,
+    "noche": 95
+  },
+  "2022-06-27": {
+    "maniana": 36,
+    "tarde": 23,
+    "noche": 74
+  },
+  "2022-06-28": {
+    "maniana": 18,
+    "tarde": 76,
+    "noche": 88
+  },
+  "2022-06-29": {
+    "maniana": 82,
+    "tarde": 98,
+    "noche": 22
+  },
+  "2022-06-30": {
+    "maniana": 98,
+    "tarde": 35,
+    "noche": 35
+  },
+  "2022-07-01": {
+    "maniana": 26,
+    "tarde": 63,
+    "noche": 11
+  },
+  "2022-07-02": {
+    "maniana": 89,
+    "tarde": 28,
+    "noche": 6
+  },
+  "2022-07-03": {
+    "maniana": 95,
+    "tarde": 15,
+    "noche": 93
+  },
+  "2022-07-04": {
+    "maniana": 17,
+    "tarde": 65,
+    "noche": 6
+  },
+  "2022-07-05": {
+    "maniana": 1,
+    "tarde": 56,
+    "noche": 98
+  },
+  "2022-07-06": {
+    "maniana": 91,
+    "tarde": 68,
+    "noche": 10
+  },
+  "2022-07-07": {
+    "maniana": 4,
+    "tarde": 29,
+    "noche": 68
+  },
+  "2022-07-08": {
+    "maniana": 60,
+    "tarde": 18,
+    "noche": 89
+  },
+  "2022-07-09": {
+    "maniana": 38,
+    "tarde": 4,
+    "noche": 20
+  },
+  "2022-07-10": {
+    "maniana": 20,
+    "tarde": 80,
+    "noche": 32
+  },
+  "2022-07-11": {
+    "maniana": 17,
+    "tarde": 62,
+    "noche": 94
+  },
+  "2022-07-12": {
+    "maniana": 96,
+    "tarde": 90,
+    "noche": 54
+  },
+  "2022-07-13": {
+    "maniana": 71,
+    "tarde": 85,
+    "noche": 61
+  },
+  "2022-07-14": {
+    "maniana": 1,
+    "tarde": 32,
+    "noche": 26
+  },
+  "2022-07-15": {
+    "maniana": 10,
+    "tarde": 32,
+    "noche": 3
+  },
+  "2022-07-16": {
+    "maniana": 75,
+    "tarde": 66,
+    "noche": 59
+  },
+  "2022-07-17": {
+    "maniana": 34,
+    "tarde": 17,
+    "noche": 50
+  },
+  "2022-07-18": {
+    "maniana": 15,
+    "tarde": 43,
+    "noche": 57
+  },
+  "2022-07-19": {
+    "maniana": 28,
+    "tarde": 48,
+    "noche": 12
+  },
+  "2022-07-20": {
+    "maniana": 51,
+    "tarde": 80,
+    "noche": 37
+  },
+  "2022-07-21": {
+    "maniana": 59,
+    "tarde": 17,
+    "noche": 86
+  },
+  "2022-07-22": {
+    "maniana": 68,
+    "tarde": 99,
+    "noche": 68
+  },
+  "2022-07-23": {
+    "maniana": 36,
+    "tarde": 2,
+    "noche": 29
+  },
+  "2022-07-24": {
+    "maniana": 79,
+    "tarde": 18,
+    "noche": 91
+  },
+  "2022-07-25": {
+    "maniana": 5,
+    "tarde": 84,
+    "noche": 78
+  },
+  "2022-07-26": {
+    "maniana": 68,
+    "tarde": 47,
+    "noche": 27
+  },
+  "2022-07-27": {
+    "maniana": 69,
+    "tarde": 82,
+    "noche": 19
+  },
+  "2022-07-28": {
+    "maniana": 92,
+    "tarde": 42,
+    "noche": 22
+  },
+  "2022-07-29": {
+    "maniana": 29,
+    "tarde": 52,
+    "noche": 46
+  },
+  "2022-07-30": {
+    "maniana": 65,
+    "tarde": 56,
+    "noche": 23
+  },
+  "2022-07-31": {
+    "maniana": 43,
+    "tarde": 93,
+    "noche": 11
+  },
+  "2022-08-01": {
+    "maniana": 42,
+    "tarde": 84,
+    "noche": 2
+  },
+  "2022-08-02": {
+    "maniana": 88,
+    "tarde": 61,
+    "noche": 74
+  },
+  "2022-08-03": {
+    "maniana": 34,
+    "tarde": 26,
+    "noche": 1
+  },
+  "2022-08-04": {
+    "maniana": 65,
+    "tarde": 69,
+    "noche": 1
+  },
+  "2022-08-05": {
+    "maniana": 25,
+    "tarde": 47,
+    "noche": 95
+  },
+  "2022-08-06": {
+    "maniana": 94,
+    "tarde": 60,
+    "noche": 19
+  },
+  "2022-08-07": {
+    "maniana": 75,
+    "tarde": 66,
+    "noche": 34
+  },
+  "2022-08-08": {
+    "maniana": 54,
+    "tarde": 60,
+    "noche": 39
+  },
+  "2022-08-09": {
+    "maniana": 62,
+    "tarde": 66,
+    "noche": 90
+  },
+  "2022-08-10": {
+    "maniana": 57,
+    "tarde": 67,
+    "noche": 41
+  },
+  "2022-08-11": {
+    "maniana": 43,
+    "tarde": 57,
+    "noche": 86
+  },
+  "2022-08-12": {
+    "maniana": 45,
+    "tarde": 14,
+    "noche": 51
+  },
+  "2022-08-13": {
+    "maniana": 40,
+    "tarde": 14,
+    "noche": 66
+  },
+  "2022-08-14": {
+    "maniana": 97,
+    "tarde": 79,
+    "noche": 50
+  },
+  "2022-08-15": {
+    "maniana": 92,
+    "tarde": 84,
+    "noche": 22
+  },
+  "2022-08-16": {
+    "maniana": 30,
+    "tarde": 44,
+    "noche": 29
+  },
+  "2022-08-17": {
+    "maniana": 9,
+    "tarde": 1,
+    "noche": 29
+  },
+  "2022-08-18": {
+    "maniana": 49,
+    "tarde": 13,
+    "noche": 71
+  },
+  "2022-08-19": {
+    "maniana": 55,
+    "tarde": 6,
+    "noche": 71
+  },
+  "2022-08-20": {
+    "maniana": 79,
+    "tarde": 82,
+    "noche": 58
+  },
+  "2022-08-21": {
+    "maniana": 83,
+    "tarde": 59,
+    "noche": 23
+  },
+  "2022-08-22": {
+    "maniana": 16,
+    "tarde": 50,
+    "noche": 0
+  },
+  "2022-08-23": {
+    "maniana": 91,
+    "tarde": 87,
+    "noche": 42
+  },
+  "2022-08-24": {
+    "maniana": 91,
+    "tarde": 92,
+    "noche": 51
+  },
+  "2022-08-25": {
+    "maniana": 8,
+    "tarde": 71,
+    "noche": 43
+  },
+  "2022-08-26": {
+    "maniana": 30,
+    "tarde": 97,
+    "noche": 3
+  },
+  "2022-08-27": {
+    "maniana": 9,
+    "tarde": 95,
+    "noche": 22
+  },
+  "2022-08-28": {
+    "maniana": 41,
+    "tarde": 29,
+    "noche": 0
+  },
+  "2022-08-29": {
+    "maniana": 50,
+    "tarde": 93,
+    "noche": 14
+  },
+  "2022-08-30": {
+    "maniana": 25,
+    "tarde": 55,
+    "noche": 57
+  },
+  "2022-08-31": {
+    "maniana": 9,
+    "tarde": 70,
+    "noche": 33
+  },
+  "2022-09-01": {
+    "maniana": 73,
+    "tarde": 12,
+    "noche": 87
+  },
+  "2022-09-02": {
+    "maniana": 6,
+    "tarde": 58,
+    "noche": 0
+  },
+  "2022-09-03": {
+    "maniana": 8,
+    "tarde": 77,
+    "noche": 22
+  },
+  "2022-09-04": {
+    "maniana": 49,
+    "tarde": 76,
+    "noche": 6
+  },
+  "2022-09-05": {
+    "maniana": 28,
+    "tarde": 43,
+    "noche": 56
+  },
+  "2022-09-06": {
+    "maniana": 0,
+    "tarde": 68,
+    "noche": 96
+  },
+  "2022-09-07": {
+    "maniana": 54,
+    "tarde": 81,
+    "noche": 91
+  },
+  "2022-09-08": {
+    "maniana": 23,
+    "tarde": 64,
+    "noche": 8
+  },
+  "2022-09-09": {
+    "maniana": 50,
+    "tarde": 55,
+    "noche": 69
+  },
+  "2022-09-10": {
+    "maniana": 50,
+    "tarde": 33,
+    "noche": 5
+  },
+  "2022-09-11": {
+    "maniana": 27,
+    "tarde": 58,
+    "noche": 6
+  },
+  "2022-09-12": {
+    "maniana": 37,
+    "tarde": 39,
+    "noche": 37
+  },
+  "2022-09-13": {
+    "maniana": 40,
+    "tarde": 52,
+    "noche": 91
+  },
+  "2022-09-14": {
+    "maniana": 32,
+    "tarde": 68,
+    "noche": 56
+  },
+  "2022-09-15": {
+    "maniana": 13,
+    "tarde": 23,
+    "noche": 85
+  },
+  "2022-09-16": {
+    "maniana": 3,
+    "tarde": 89,
+    "noche": 3
+  },
+  "2022-09-17": {
+    "maniana": 91,
+    "tarde": 64,
+    "noche": 84
+  },
+  "2022-09-18": {
+    "maniana": 97,
+    "tarde": 78,
+    "noche": 55
+  },
+  "2022-09-19": {
+    "maniana": 2,
+    "tarde": 63,
+    "noche": 95
+  },
+  "2022-09-20": {
+    "maniana": 9,
+    "tarde": 49,
+    "noche": 58
+  },
+  "2022-09-21": {
+    "maniana": 27,
+    "tarde": 55,
+    "noche": 17
+  },
+  "2022-09-22": {
+    "maniana": 46,
+    "tarde": 18,
+    "noche": 54
+  },
+  "2022-09-23": {
+    "maniana": 53,
+    "tarde": 10,
+    "noche": 87
+  },
+  "2022-09-24": {
+    "maniana": 96,
+    "tarde": 6,
+    "noche": 77
+  },
+  "2022-09-25": {
+    "maniana": 43,
+    "tarde": 18,
+    "noche": 21
+  },
+  "2022-09-26": {
+    "maniana": 33,
+    "tarde": 87,
+    "noche": 14
+  },
+  "2022-09-27": {
+    "maniana": 77,
+    "tarde": 10,
+    "noche": 35
+  },
+  "2022-09-28": {
+    "maniana": 37,
+    "tarde": 71,
+    "noche": 65
+  },
+  "2022-09-29": {
+    "maniana": 47,
+    "tarde": 58,
+    "noche": 80
+  },
+  "2022-09-30": {
+    "maniana": 58,
+    "tarde": 26,
+    "noche": 6
+  },
+  "2022-10-01": {
+    "maniana": 36,
+    "tarde": 6,
+    "noche": 11
+  },
+  "2022-10-02": {
+    "maniana": 77,
+    "tarde": 54,
+    "noche": 56
+  },
+  "2022-10-03": {
+    "maniana": 26,
+    "tarde": 77,
+    "noche": 81
+  },
+  "2022-10-04": {
+    "maniana": 18,
+    "tarde": 91,
+    "noche": 65
+  },
+  "2022-10-05": {
+    "maniana": 87,
+    "tarde": 61,
+    "noche": 24
+  },
+  "2022-10-06": {
+    "maniana": 42,
+    "tarde": 0,
+    "noche": 45
+  },
+  "2022-10-07": {
+    "maniana": 12,
+    "tarde": 58,
+    "noche": 37
+  },
+  "2022-10-08": {
+    "maniana": 40,
+    "tarde": 44,
+    "noche": 92
+  },
+  "2022-10-09": {
+    "maniana": 67,
+    "tarde": 27,
+    "noche": 37
+  },
+  "2022-10-10": {
+    "maniana": 88,
+    "tarde": 12,
+    "noche": 73
+  },
+  "2022-10-11": {
+    "maniana": 99,
+    "tarde": 45,
+    "noche": 88
+  },
+  "2022-10-12": {
+    "maniana": 53,
+    "tarde": 14,
+    "noche": 71
+  },
+  "2022-10-13": {
+    "maniana": 95,
+    "tarde": 72,
+    "noche": 76
+  },
+  "2022-10-14": {
+    "maniana": 44,
+    "tarde": 32,
+    "noche": 18
+  },
+  "2022-10-15": {
+    "maniana": 96,
+    "tarde": 97,
+    "noche": 74
+  },
+  "2022-10-16": {
+    "maniana": 11,
+    "tarde": 26,
+    "noche": 12
+  },
+  "2022-10-17": {
+    "maniana": 1,
+    "tarde": 66,
+    "noche": 72
+  },
+  "2022-10-18": {
+    "maniana": 98,
+    "tarde": 44,
+    "noche": 26
+  },
+  "2022-10-19": {
+    "maniana": 84,
+    "tarde": 29,
+    "noche": 58
+  },
+  "2022-10-20": {
+    "maniana": 10,
+    "tarde": 95,
+    "noche": 97
+  },
+  "2022-10-21": {
+    "maniana": 0,
+    "tarde": 18,
+    "noche": 95
+  },
+  "2022-10-22": {
+    "maniana": 71,
+    "tarde": 22,
+    "noche": 65
+  },
+  "2022-10-23": {
+    "maniana": 8,
+    "tarde": 85,
+    "noche": 98
+  },
+  "2022-10-24": {
+    "maniana": 77,
+    "tarde": 87,
+    "noche": 10
+  },
+  "2022-10-25": {
+    "maniana": 48,
+    "tarde": 62,
+    "noche": 81
+  },
+  "2022-10-26": {
+    "maniana": 11,
+    "tarde": 20,
+    "noche": 25
+  },
+  "2022-10-27": {
+    "maniana": 19,
+    "tarde": 21,
+    "noche": 70
+  },
+  "2022-10-28": {
+    "maniana": 25,
+    "tarde": 16,
+    "noche": 95
+  },
+  "2022-10-29": {
+    "maniana": 45,
+    "tarde": 38,
+    "noche": 21
+  },
+  "2022-10-30": {
+    "maniana": 47,
+    "tarde": 21,
+    "noche": 84
+  },
+  "2022-10-31": {
+    "maniana": 54,
+    "tarde": 73,
+    "noche": 49
+  },
+  "2022-11-01": {
+    "maniana": 83,
+    "tarde": 44,
+    "noche": 71
+  },
+  "2022-11-02": {
+    "maniana": 73,
+    "tarde": 17,
+    "noche": 89
+  },
+  "2022-11-03": {
+    "maniana": 88,
+    "tarde": 97,
+    "noche": 28
+  },
+  "2022-11-04": {
+    "maniana": 9,
+    "tarde": 48,
+    "noche": 16
+  },
+  "2022-11-05": {
+    "maniana": 68,
+    "tarde": 76,
+    "noche": 67
+  },
+  "2022-11-06": {
+    "maniana": 71,
+    "tarde": 19,
+    "noche": 8
+  },
+  "2022-11-07": {
+    "maniana": 73,
+    "tarde": 12,
+    "noche": 94
+  },
+  "2022-11-08": {
+    "maniana": 41,
+    "tarde": 87,
+    "noche": 43
+  },
+  "2022-11-09": {
+    "maniana": 17,
+    "tarde": 99,
+    "noche": 29
+  },
+  "2022-11-10": {
+    "maniana": 81,
+    "tarde": 19,
+    "noche": 30
+  },
+  "2022-11-11": {
+    "maniana": 82,
+    "tarde": 25,
+    "noche": 88
+  },
+  "2022-11-12": {
+    "maniana": 85,
+    "tarde": 83,
+    "noche": 19
+  },
+  "2022-11-13": {
+    "maniana": 67,
+    "tarde": 82,
+    "noche": 43
+  },
+  "2022-11-14": {
+    "maniana": 26,
+    "tarde": 98,
+    "noche": 53
+  },
+  "2022-11-15": {
+    "maniana": 53,
+    "tarde": 79,
+    "noche": 7
+  },
+  "2022-11-16": {
+    "maniana": 4,
+    "tarde": 33,
+    "noche": 75
+  },
+  "2022-11-17": {
+    "maniana": 60,
+    "tarde": 3,
+    "noche": 31
+  },
+  "2022-11-18": {
+    "maniana": 92,
+    "tarde": 5,
+    "noche": 93
+  },
+  "2022-11-19": {
+    "maniana": 84,
+    "tarde": 92,
+    "noche": 40
+  },
+  "2022-11-20": {
+    "maniana": 32,
+    "tarde": 76,
+    "noche": 52
+  },
+  "2022-11-21": {
+    "maniana": 99,
+    "tarde": 63,
+    "noche": 80
+  },
+  "2022-11-22": {
+    "maniana": 99,
+    "tarde": 91,
+    "noche": 7
+  },
+  "2022-11-23": {
+    "maniana": 84,
+    "tarde": 71,
+    "noche": 20
+  },
+  "2022-11-24": {
+    "maniana": 75,
+    "tarde": 63,
+    "noche": 47
+  },
+  "2022-11-25": {
+    "maniana": 15,
+    "tarde": 73,
+    "noche": 7
+  },
+  "2022-11-26": {
+    "maniana": 61,
+    "tarde": 46,
+    "noche": 70
+  },
+  "2022-11-27": {
+    "maniana": 64,
+    "tarde": 19,
+    "noche": 18
+  },
+  "2022-11-28": {
+    "maniana": 28,
+    "tarde": 64,
+    "noche": 36
+  },
+  "2022-11-29": {
+    "maniana": 43,
+    "tarde": 31,
+    "noche": 5
+  },
+  "2022-11-30": {
+    "maniana": 18,
+    "tarde": 9,
+    "noche": 75
+  },
+  "2022-12-01": {
+    "maniana": 36,
+    "tarde": 28,
+    "noche": 19
+  },
+  "2022-12-02": {
+    "maniana": 60,
+    "tarde": 57,
+    "noche": 47
+  },
+  "2022-12-03": {
+    "maniana": 42,
+    "tarde": 60,
+    "noche": 37
+  },
+  "2022-12-04": {
+    "maniana": 99,
+    "tarde": 42,
+    "noche": 53
+  },
+  "2022-12-05": {
+    "maniana": 7,
+    "tarde": 58,
+    "noche": 33
+  },
+  "2022-12-06": {
+    "maniana": 51,
+    "tarde": 79,
+    "noche": 96
+  },
+  "2022-12-07": {
+    "maniana": 99,
+    "tarde": 53,
+    "noche": 31
+  },
+  "2022-12-08": {
+    "maniana": 61,
+    "tarde": 71,
+    "noche": 71
+  },
+  "2022-12-09": {
+    "maniana": 26,
+    "tarde": 52,
+    "noche": 84
+  },
+  "2022-12-10": {
+    "maniana": 68,
+    "tarde": 34,
+    "noche": 78
+  },
+  "2022-12-11": {
+    "maniana": 21,
+    "tarde": 79,
+    "noche": 0
+  },
+  "2022-12-12": {
+    "maniana": 77,
+    "tarde": 52,
+    "noche": 87
+  },
+  "2022-12-13": {
+    "maniana": 24,
+    "tarde": 15,
+    "noche": 68
+  },
+  "2022-12-14": {
+    "maniana": 43,
+    "tarde": 22,
+    "noche": 32
+  },
+  "2022-12-15": {
+    "maniana": 23,
+    "tarde": 68,
+    "noche": 4
+  },
+  "2022-12-16": {
+    "maniana": 83,
+    "tarde": 63,
+    "noche": 1
+  },
+  "2022-12-17": {
+    "maniana": 78,
+    "tarde": 40,
+    "noche": 76
+  },
+  "2022-12-18": {
+    "maniana": 48,
+    "tarde": 69,
+    "noche": 83
+  },
+  "2022-12-19": {
+    "maniana": 94,
+    "tarde": 87,
+    "noche": 9
+  },
+  "2022-12-20": {
+    "maniana": 87,
+    "tarde": 46,
+    "noche": 37
+  },
+  "2022-12-21": {
+    "maniana": 24,
+    "tarde": 43,
+    "noche": 56
+  },
+  "2022-12-22": {
+    "maniana": 53,
+    "tarde": 24,
+    "noche": 85
+  },
+  "2022-12-23": {
+    "maniana": 48,
+    "tarde": 88,
+    "noche": 3
+  },
+  "2022-12-24": {
+    "maniana": 94,
+    "tarde": 44,
+    "noche": 72
+  },
+  "2022-12-25": {
+    "maniana": 58,
+    "tarde": 15,
+    "noche": 16
+  },
+  "2022-12-26": {
+    "maniana": 13,
+    "tarde": 96,
+    "noche": 57
+  },
+  "2022-12-27": {
+    "maniana": 53,
+    "tarde": 12,
+    "noche": 8
+  },
+  "2022-12-28": {
+    "maniana": 90,
+    "tarde": 93,
+    "noche": 58
+  },
+  "2022-12-29": {
+    "maniana": 56,
+    "tarde": 2,
+    "noche": 6
+  },
+  "2022-12-30": {
+    "maniana": 36,
+    "tarde": 55,
+    "noche": 47
+  },
+  "2022-12-31": {
+    "maniana": 88,
+    "tarde": 50,
+    "noche": 9
+  },
   "2023-01-01": {
     "maniana": 75,
     "tarde": 30,
@@ -1427,7 +3252,7 @@
   "2023-10-13": {
     "maniana": 46,
     "tarde": 21,
-    "noche": null
+    "noche": 96
   },
   "2023-10-14": {
     "maniana": 21,
@@ -1506,7 +3331,7 @@
   },
   "2023-10-29": {
     "maniana": 65,
-    "tarde": null,
+    "tarde": 78,
     "noche": 84
   },
   "2023-10-30": {
@@ -5872,6 +7697,41 @@
   "2026-03-20": {
     "maniana": 93,
     "tarde": 61,
-    "noche": null
+    "noche": 60
+  },
+  "2026-03-21": {
+    "maniana": 74,
+    "tarde": 48,
+    "noche": 45
+  },
+  "2026-03-22": {
+    "maniana": 75,
+    "tarde": 41,
+    "noche": 63
+  },
+  "2026-03-23": {
+    "maniana": 46,
+    "tarde": 91,
+    "noche": 55
+  },
+  "2026-03-24": {
+    "maniana": 26,
+    "tarde": 92,
+    "noche": 12
+  },
+  "2026-03-25": {
+    "maniana": 52,
+    "tarde": 83,
+    "noche": 96
+  },
+  "2026-03-26": {
+    "maniana": 72,
+    "tarde": 64,
+    "noche": 73
+  },
+  "2026-03-27": {
+    "maniana": 85,
+    "tarde": 10,
+    "noche": 53
   }
 }
