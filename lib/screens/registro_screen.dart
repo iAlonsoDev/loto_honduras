@@ -4,10 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/sorteo_model.dart';
-import '../services/firestore_service.dart';
+import '../services/database.dart';
 import '../theme/app_theme.dart';
-import '../widgets/libro_suenos_sheet.dart';
-import '../data/libro_suenos.dart';
 
 class RegistroScreen extends StatefulWidget {
   const RegistroScreen({super.key});
@@ -17,7 +15,7 @@ class RegistroScreen extends StatefulWidget {
 }
 
 class _RegistroScreenState extends State<RegistroScreen> {
-  final _service = FirestoreService();
+  final _db = DatabaseService.instance;
   final _formKey = GlobalKey<FormState>();
 
   final _manianaCtrl = TextEditingController();
@@ -28,7 +26,6 @@ class _RegistroScreenState extends State<RegistroScreen> {
   DateTime _fechaSeleccionada = DateTime.now();
   bool _guardando = false;
 
-  bool get _bloqueado => false; // Permitir editar siempre
 
   @override
   void initState() {
@@ -36,8 +33,8 @@ class _RegistroScreenState extends State<RegistroScreen> {
     _cargarSorteoExistente();
   }
 
-  Future<void> _cargarSorteoExistente() async {
-    final sorteo = await _service.obtenerSorteoPorFecha(_fechaSeleccionada);
+  void _cargarSorteoExistente() {
+    final sorteo = _db.buscarPorFecha(_fechaSeleccionada);
     if (mounted) {
       setState(() {
         if (sorteo != null) {
@@ -80,7 +77,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
     );
     if (picked != null) {
       setState(() => _fechaSeleccionada = picked);
-      await _cargarSorteoExistente();
+      _cargarSorteoExistente();
     }
   }
 
@@ -103,8 +100,8 @@ class _RegistroScreenState extends State<RegistroScreen> {
             : int.parse(_nocheCtrl.text),
         notas: _notasCtrl.text,
       );
-      await _service.guardarSorteo(sorteo);
-      await _cargarSorteoExistente();
+      await _db.guardarSorteo(sorteo);
+      _cargarSorteoExistente();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -126,91 +123,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
   }
 
 
-  Future<void> _abrirLibroSuenos() async {
-    final numero = await mostrarLibroSuenos(context);
-    if (numero == null || !mounted) return;
 
-    final significado = libroSuenos[numero] ?? '';
-    final numStr = numero.toString().padLeft(2, '0');
-
-    // Preguntar a qué sorteo asignar el número
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.cardColor,
-        title: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppTheme.primaryColor, AppTheme.accentColor],
-                ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  numStr,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Número $numStr', style: const TextStyle(fontSize: 15)),
-                  Text(
-                    significado,
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                    maxLines: 2,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        content: const Text('¿Asignar a qué sorteo?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              _manianaCtrl.text = numStr;
-              Navigator.pop(ctx);
-            },
-            child: const Text(
-              '🌅 Mañana',
-              style: TextStyle(color: AppTheme.goldColor),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              _tardeCtrl.text = numStr;
-              Navigator.pop(ctx);
-            },
-            child: const Text(
-              '☀️ Tarde',
-              style: TextStyle(color: AppTheme.orangeColor),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              _nocheCtrl.text = numStr;
-              Navigator.pop(ctx);
-            },
-            child: const Text(
-              '🌙 Noche',
-              style: TextStyle(color: Colors.purple),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   String? _validarNumero(String? value) {
     if (value == null || value.isEmpty) return null; // Permitir vacío
@@ -261,21 +174,6 @@ class _RegistroScreenState extends State<RegistroScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         _buildSectionTitle('Números del sorteo'),
-                        if (!_bloqueado)
-                          TextButton.icon(
-                            onPressed: _abrirLibroSuenos,
-                            icon: const Text(
-                              '🔮',
-                              style: TextStyle(fontSize: 14),
-                            ),
-                            label: const Text(
-                              'Libro de sueños',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.goldColor,
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                     const SizedBox(height: 12),

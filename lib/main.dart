@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'firebase_options.dart'; // Generado por FlutterFire CLI
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'services/database.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +16,9 @@ void main() async {
 
   // Inicializar locale en español para fechas
   await initializeDateFormatting('es', null);
+
+  // Cargar caché central de sorteos (una sola vez al iniciar)
+  await DatabaseService.instance.cargar();
 
   runApp(const LotoHondurasApp());
 }

@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/sorteo_model.dart';
-import '../services/firestore_service.dart';
+import '../services/database.dart';
 import '../theme/app_theme.dart';
 import '../data/libro_suenos.dart';
 import '../data/grupos_semanticos.dart';
@@ -16,7 +16,7 @@ class HistorialScreen extends StatefulWidget {
 }
 
 class _HistorialScreenState extends State<HistorialScreen> {
-  final _service = FirestoreService();
+  final _db = DatabaseService.instance;
   List<SorteoModel> _sorteos = [];
   List<SorteoModel> _filtrados = [];
   bool _loading = true;
@@ -27,31 +27,25 @@ class _HistorialScreenState extends State<HistorialScreen> {
   @override
   void initState() {
     super.initState();
-    _cargar();
+    _db.addListener(_sincronizar);
+    _sincronizar();
   }
 
-  Future<void> _cargar() async {
+  void _sincronizar() {
+    if (!mounted) return;
+    final sorteos = _db.sorteos;
     setState(() {
-      _loading = true;
-      _error = null;
+      _loading = _db.cargando;
+      _error = _db.error;
+      _sorteos = sorteos;
+      _filtrados = _numBuscado == null
+          ? sorteos
+          : sorteos.where((s) => s.numeros.contains(_numBuscado)).toList();
     });
-    try {
-      final sorteos = await _service.obtenerTodosLosSorteos();
-      if (mounted) {
-        setState(() {
-          _sorteos = sorteos;
-          _filtrados = sorteos;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = e.toString();
-        });
-      }
-    }
+  }
+
+  Future<void> _refrescar() async {
+    await _db.cargar(forzar: true);
   }
 
   void _buscar(String query) {
@@ -190,8 +184,8 @@ class _HistorialScreenState extends State<HistorialScreen> {
       ),
     );
     if (confirm == true) {
-      await _service.eliminarSorteo(sorteo.fechaKey);
-      _cargar();
+      await _db.eliminarSorteo(sorteo.fechaKey);
+      // listener _sincronizar se encarga del re-render
     }
   }
 
@@ -201,7 +195,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
       appBar: AppBar(
         title: const Text('📋 Historial'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _refrescar),
         ],
       ),
       body: Column(
@@ -289,7 +283,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
                           ),
                           const SizedBox(height: 12),
                           ElevatedButton(
-                            onPressed: _cargar,
+                            onPressed: _refrescar,
                             child: const Text('Reintentar'),
                           ),
                         ],
@@ -656,6 +650,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
 
   @override
   void dispose() {
+    _db.removeListener(_sincronizar);
     _busquedaCtrl.dispose();
     super.dispose();
   }

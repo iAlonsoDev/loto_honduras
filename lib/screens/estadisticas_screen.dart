@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../models/sorteo_model.dart';
-import '../services/firestore_service.dart';
+import '../services/database.dart';
 import '../theme/app_theme.dart';
 import '../data/libro_suenos.dart';
 
@@ -17,7 +17,7 @@ class EstadisticasScreen extends StatefulWidget {
 
 class _EstadisticasScreenState extends State<EstadisticasScreen>
     with SingleTickerProviderStateMixin {
-  final _service = FirestoreService();
+  final _db = DatabaseService.instance;
   List<SorteoModel> _allSorteos = [];
   _Periodo _periodo = _Periodo.mes;
   bool _loading = true;
@@ -32,37 +32,29 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _cargar();
+    _db.addListener(_sincronizar);
+    _sincronizar();
   }
 
   @override
   void dispose() {
+    _db.removeListener(_sincronizar);
     _tabController.dispose();
     super.dispose();
   }
 
-  Future<void> _cargar() async {
+  void _sincronizar() {
+    if (!mounted) return;
     setState(() {
-      _loading = true;
-      _error = null;
+      _loading = _db.cargando;
+      _error = _db.error;
+      _allSorteos = _db.sorteos;
     });
-    try {
-      final sorteos = await _service.obtenerTodosLosSorteos();
-      if (mounted) {
-        setState(() {
-          _allSorteos = sorteos;
-          _loading = false;
-        });
-        _recomputar();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = e.toString();
-        });
-      }
-    }
+    if (!_db.cargando) _recomputar();
+  }
+
+  Future<void> _refrescar() async {
+    await _db.cargar(forzar: true);
   }
 
   void _recomputar() {
@@ -133,7 +125,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
       appBar: AppBar(
         title: const Text('📊 Estadísticas'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _refrescar),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(96),
@@ -259,7 +251,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            ElevatedButton(onPressed: _cargar, child: const Text('Reintentar')),
+            ElevatedButton(onPressed: _refrescar, child: const Text('Reintentar')),
           ],
         ),
       ),
