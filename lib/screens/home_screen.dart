@@ -6,6 +6,7 @@ import 'registro_screen.dart';
 import 'historial_screen.dart';
 import 'estadisticas_screen.dart';
 import 'analisis_screen.dart';
+import 'simbolos_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = const [
     RegistroScreen(),
     HistorialScreen(),
+    SimbolosScreen(),
     EstadisticasScreen(),
     AnalisisScreen(),
   ];
@@ -50,6 +52,10 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Historial',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.auto_awesome_rounded),
+            label: 'Simbología',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart_rounded),
             label: 'Estadísticas',
           ),
@@ -57,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.insights_rounded),
             label: 'Análisis',
           ),
+          
         ],
       ),
     );

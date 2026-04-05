@@ -23,6 +23,8 @@ class _HistorialScreenState extends State<HistorialScreen> {
   String? _error;
   final _busquedaCtrl = TextEditingController();
   int? _numBuscado;
+  int? _decenaFiltro;    // 0-9: filtra días donde jugó algún número con ese primer dígito
+  String? _grupoFiltro;  // Animales, Armas, etc.
 
   @override
   void initState() {
@@ -33,47 +35,68 @@ class _HistorialScreenState extends State<HistorialScreen> {
 
   void _sincronizar() {
     if (!mounted) return;
-    final sorteos = _db.sorteos;
     setState(() {
       _loading = _db.cargando;
       _error = _db.error;
-      _sorteos = sorteos;
-      _filtrados = _numBuscado == null
-          ? sorteos
-          : sorteos.where((s) => s.numeros.contains(_numBuscado)).toList();
+      _sorteos = _db.sorteos;
     });
+    _aplicarFiltros();
   }
 
-  Future<void> _refrescar() async {
-    await _db.cargar(forzar: true);
-  }
+  Future<void> _refrescar() async => _db.cargar(forzar: true);
 
   void _buscar(String query) {
-    final num = int.tryParse(query);
-    setState(() {
-      _numBuscado = num;
-      if (query.isEmpty) {
-        _filtrados = _sorteos;
-      } else if (num != null && num >= 0 && num <= 99) {
-        _filtrados = _sorteos.where((s) => s.numeros.contains(num)).toList();
-      } else {
-        _filtrados = [];
-      }
-    });
+    _numBuscado = int.tryParse(query);
+    _aplicarFiltros();
   }
+
+  void _aplicarFiltros() {
+    var lista = _sorteos;
+    // Filtro por número exacto
+    if (_numBuscado != null && _numBuscado! >= 0 && _numBuscado! <= 99) {
+      lista = lista.where((s) => s.numeros.contains(_numBuscado)).toList();
+    } else if (_busquedaCtrl.text.isNotEmpty && _numBuscado == null) {
+      lista = [];
+    }
+    // Filtro por decena (primer dígito)
+    if (_decenaFiltro != null) {
+      lista = lista.where((s) =>
+        s.numeros.whereType<int>().any((n) => n ~/ 10 == _decenaFiltro)
+      ).toList();
+    }
+    // Filtro por grupo semántico
+    if (_grupoFiltro != null) {
+      lista = lista.where((s) =>
+        s.numeros.whereType<int>().any((n) => _enGrupo(n, _grupoFiltro!))
+      ).toList();
+    }
+    setState(() => _filtrados = lista);
+  }
+
+  bool _enGrupo(int numero, String grupo) {
+    final miembros = gruposSemanticos[grupo] ?? [];
+    if (miembros.contains(numero)) return true;
+    final punto = numero ~/ 10 + numero % 10;
+    return miembros.contains(punto);
+  }
+
+  int _contarGrupo(String grupo) =>
+      _sorteos.where((s) =>
+        s.numeros.whereType<int>().any((n) => _enGrupo(n, grupo))
+      ).length;
 
   // ── Quebrado helpers ────────────────────────────────────────────────────────
 
   List<int> _equivalentesDigito(int d) {
     switch (d) {
-      case 0: return [0, 1, 7, 4];
-      case 1: return [1, 7, 4, 0];
+      case 0: return [0, 1];
+      case 1: return [1, 7, 0];
       case 2: return [2, 5];
       case 3: return [3, 8];
-      case 4: return [4, 0, 1, 7];
+      case 4: return [4, 7];
       case 5: return [5, 2];
       case 6: return [6, 9];
-      case 7: return [7, 1, 4, 0];
+      case 7: return [7, 4, 1];
       case 8: return [8, 3];
       case 9: return [9, 6];
       default: return [d];
@@ -225,24 +248,100 @@ class _HistorialScreenState extends State<HistorialScreen> {
             ),
           ),
 
-          // Resultado de búsqueda
-          if (_numBuscado != null)
+          // ── Chips de decena (0-9) ────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  const Text('Dígito:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  const SizedBox(width: 6),
+                  ...List.generate(10, (d) {
+                    final selected = _decenaFiltro == d;
+                    // Contar cuántos días tienen al menos un número de esta decena
+                    final count = _sorteos.where((s) =>
+                      s.numeros.whereType<int>().any((n) => n ~/ 10 == d)
+                    ).length;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: FilterChip(
+                        label: Text('${d}x  $count'),
+                        selected: selected,
+                        onSelected: (val) {
+                          _decenaFiltro = val ? d : null;
+                          _aplicarFiltros();
+                        },
+                        selectedColor: AppTheme.goldColor.withOpacity(0.25),
+                        checkmarkColor: AppTheme.goldColor,
+                        labelStyle: TextStyle(
+                          fontSize: 11,
+                          color: selected ? AppTheme.goldColor : Colors.grey,
+                          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Chips de grupo semántico ─────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  const Text('Grupo:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  const SizedBox(width: 6),
+                  ...gruposSemanticos.keys.map((grupo) {
+                    final count = _contarGrupo(grupo);
+                    final selected = _grupoFiltro == grupo;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: FilterChip(
+                        label: Text('$grupo  $count'),
+                        selected: selected,
+                        onSelected: (val) {
+                          _grupoFiltro = val ? grupo : null;
+                          _aplicarFiltros();
+                        },
+                        selectedColor: AppTheme.goldColor.withOpacity(0.25),
+                        checkmarkColor: AppTheme.goldColor,
+                        labelStyle: TextStyle(
+                          fontSize: 11,
+                          color: selected ? AppTheme.goldColor : Colors.grey,
+                          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+
+          // Resultado de búsqueda / decena activa
+          if (_numBuscado != null || _decenaFiltro != null || _grupoFiltro != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               color: AppTheme.primaryColor.withOpacity(0.2),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: AppTheme.goldColor,
-                  ),
+                  const Icon(Icons.info_outline, size: 16, color: AppTheme.goldColor),
                   const SizedBox(width: 8),
-                  Text(
-                    'El número ${_numBuscado!.toString().padLeft(2, '0')} ha salido ${_filtrados.length} veces',
-                    style: const TextStyle(
-                      color: AppTheme.goldColor,
-                      fontSize: 13,
+                  Expanded(
+                    child: Text(
+                      _numBuscado != null
+                          ? 'El ${_numBuscado!.toString().padLeft(2, '0')} salió ${_filtrados.length} veces'
+                          : _decenaFiltro != null
+                              ? 'Números ${_decenaFiltro}0-${_decenaFiltro}9: ${_filtrados.length} días'
+                              : '$_grupoFiltro: ${_filtrados.length} días',
+                      style: const TextStyle(color: AppTheme.goldColor, fontSize: 13),
                     ),
                   ),
                 ],
@@ -508,6 +607,17 @@ class _HistorialScreenState extends State<HistorialScreen> {
     );
   }
 
+  /// Retorna el nombre del grupo al que pertenece [numero] (directo o por punto)
+  String? _grupoDeNumero(int numero) {
+    for (final entry in gruposSemanticos.entries) {
+      final miembros = entry.value;
+      if (miembros.contains(numero)) return entry.key;
+      final punto = numero ~/ 10 + numero % 10;
+      if (miembros.contains(punto)) return entry.key;
+    }
+    return null;
+  }
+
   Widget _buildNumBadge(String label, int? numero, Color color, int? buscado) {
     if (numero == null) {
       return Column(
@@ -515,68 +625,91 @@ class _HistorialScreenState extends State<HistorialScreen> {
           Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
           const SizedBox(height: 4),
           Container(
-            width: 52,
-            height: 52,
+            width: 52, height: 52,
             decoration: BoxDecoration(
               color: Colors.grey.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey, width: 1),
             ),
-            child: const Center(
-              child: Text(
-                '--',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                ),
-              ),
-            ),
+            child: const Center(child: Text('--', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey))),
           ),
         ],
       );
     }
+
     final highlighted = buscado != null && buscado == numero;
     final sig = significadoCorto(numero);
-    return Column(
-      children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-        const SizedBox(height: 4),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: highlighted ? AppTheme.accentColor : color.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: highlighted ? AppTheme.accentColor : color,
-              width: highlighted ? 3 : 1,
+    final grupoNum = _grupoDeNumero(numero);
+
+    // Determina si este número aplica al filtro activo
+    final hayFiltro = _grupoFiltro != null || _decenaFiltro != null;
+    final matchGrupo = _grupoFiltro == null || _enGrupo(numero, _grupoFiltro!);
+    final matchDecena = _decenaFiltro == null || numero ~/ 10 == _decenaFiltro;
+    final matchFiltro = matchGrupo && matchDecena;
+
+    // Colores según match
+    final borderColor = highlighted
+        ? AppTheme.accentColor
+        : (hayFiltro && matchFiltro)
+            ? Colors.green
+            : color;
+    final bgColor = highlighted
+        ? AppTheme.accentColor
+        : (hayFiltro && matchFiltro)
+            ? Colors.green.withOpacity(0.15)
+            : color.withOpacity(0.2);
+    final textColor = highlighted
+        ? Colors.white
+        : (hayFiltro && matchFiltro)
+            ? Colors.green
+            : color;
+    final borderWidth = (highlighted || (hayFiltro && matchFiltro)) ? 2.5 : 1.0;
+    final opacity = (hayFiltro && !matchFiltro) ? 0.25 : 1.0;
+
+    return Opacity(
+      opacity: opacity,
+      child: Column(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          const SizedBox(height: 4),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor, width: borderWidth),
             ),
-          ),
-          child: Center(
-            child: Text(
-              numero.toString().padLeft(2, '0'),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: highlighted ? Colors.white : color,
+            child: Center(
+              child: Text(
+                numero.toString().padLeft(2, '0'),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 3),
-        SizedBox(
-          width: 60,
-          child: Text(
-            sig,
-            style: const TextStyle(fontSize: 9, color: Colors.grey),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          const SizedBox(height: 3),
+          SizedBox(
+            width: 60,
+            child: Text(sig, style: const TextStyle(fontSize: 9, color: Colors.grey),
+              textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
-        ),
-      ],
+          if (grupoNum != null)
+            SizedBox(
+              width: 60,
+              child: Text(
+                grupoNum,
+                style: TextStyle(
+                  fontSize: 8,
+                  color: (hayFiltro && matchFiltro) ? Colors.green : Colors.grey.withOpacity(0.7),
+                  fontWeight: (hayFiltro && matchFiltro) ? FontWeight.bold : FontWeight.normal,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+      ),
     );
   }
 

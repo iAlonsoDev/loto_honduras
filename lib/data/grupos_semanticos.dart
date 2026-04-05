@@ -3,10 +3,10 @@
 
 const Map<String, List<int>> gruposSemanticos = {
   'Transporte':     [0, 53, 81, 83, 94],        // Avión, Llanta, Rieles, Bote, Carro
-  'Animales':       [4, 8, 11, 12, 13, 23, 24, 43, 62, 67, 87, 91, 92],
-                                                  // Tigre, Conejo, Perro, Caballo, Gato,
-                                                  // Mono, Sapo, Pantera, Lagarto, Vaca,
-                                                  // León, Tortuga, Águila
+  'Animales':       [4, 6, 8, 11, 12, 13, 15, 23, 24, 28, 31, 32, 43, 52, 58, 62, 67, 87, 89, 91, 92],
+                                                  // Tigre, Elefante, Conejo, Perro, Caballo, Gato,
+                                                  // Ratón, Mono, Sapo, Gallo, Alacrán, Culebra, Pantera,
+                                                  // Zorrillo, Venado, Lagarto, Vaca, León, Búho, Tortuga, Águila
   'Familia':        [2, 9, 14, 16, 17, 29, 36, 41, 42, 46, 97],
                                                   // Mujer, Hombre, Boda, Niña, Joven,
                                                   // Padre, Viejita, Novia, Madre, Familia, Viejito
@@ -16,19 +16,16 @@ const Map<String, List<int>> gruposSemanticos = {
                                                   // Iglesia, Diablo, Coronas
   'Dinero':         [25, 47, 70, 96],            // Balanza, Banco, Oro, Dinero
   'Armas':          [7, 38, 57, 61, 69],         // Navaja, Pistola, Cuchillo, Guerra, Soldado
-  'Naturaleza':     [19, 21, 48, 50, 56, 59, 76, 79],
-                                                  // Mariposa, Pájaro, Estrella, Luna nueva,
+  'Naturaleza':     [19, 21, 48, 49, 50, 56, 59, 76, 79],
+                                                  // Mariposa, Pájaro, Estrella, Sombra, Luna nueva,
                                                   // Árbol, Selva, Palomas, Flores
   'Oficios':        [33, 51, 68, 93, 95],        // Carpintero, Policía, Ladrón, Cartero, Costurera
   'Bebidas':        [30, 54, 80],                // Bolo, Licor, Café
   'Cuerpo':         [1, 5, 71],                  // Pies, Embarazada, Zapatos
-  'Objetos':        [6, 10, 15, 20, 25, 27, 28, 34, 37, 39, 52, 55,
-                     60, 63, 65, 72, 73, 75, 77, 78, 82, 86, 89, 90, 98, 99],
-                                                  // Elefante, Anillo, Ratón, Espejo, Balanza,
-                                                  // Juego, Gallo, Música, Suerte, Jabón,
-                                                  // Zorrillo, Olas, Dragón, Coco, Pintura,
-                                                  // Arco, Fuego, Reina, Humo, Tienda,
-                                                  // Escuela, Reloj, Búho, Lentes, Bailes, Aretes
+  'Objetos':        [10, 20, 26, 27, 34, 37, 39, 55, 60, 63, 65, 72, 73, 75, 77, 78, 82, 86, 90, 98, 99],
+                                                  // Anillo, Espejo, Bandera, Juego, Música, Suerte, Jabón,
+                                                  // Olas, Dragón, Coco, Pintura, Arco, Fuego, Reina,
+                                                  // Humo, Tienda, Escuela, Reloj, Lentes, Bailes, Aretes
 };
 
 /// Devuelve el nombre del grupo al que pertenece [numero], o null si no está clasificado.
