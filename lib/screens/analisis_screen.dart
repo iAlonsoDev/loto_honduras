@@ -2,10 +2,13 @@
 
 import 'dart:math' show max, min;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/sorteo_model.dart';
 import '../services/database.dart';
 import '../theme/app_theme.dart';
 import '../data/libro_suenos.dart';
+
+
 class AnalisisScreen extends StatefulWidget {
   const AnalisisScreen({super.key});
   @override
@@ -19,10 +22,6 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   // Datos cargados
   List<SorteoModel> _sorteos = [];
 
-  // Base
-  List<EstadisticaNumero> _calientes = [];
-  List<EstadisticaNumero> _frios = [];
-  List<EstadisticaNumero> _repetidosMes = [];
   Map<int, EstadisticaNumero>? _allStats;
   bool _loading = true;
   String? _error;
@@ -31,15 +30,28 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   Map<int, Map<String, int>> _porHorario = {};
   Map<int, int> _totalPorDia = {};
   Map<int, List<MapEntry<int, int>>> _frecPorDia = {};
-  List<MapEntry<String, int>> _pares = [];
 
   // Búsqueda global
-  String _searchGlobal = '';
+  final String _searchGlobal = '';
   late TextEditingController _searchController;
+
+
+
+  // Tab Pares
+  int? _paresNumBuscado;
+  String _paresPeriodo = 'historico';
+  late TextEditingController _paresCtrl;
 
   // Ciclos (Max ausencia tracking)
   Map<int, int> _ciclosMax = {}; // max days without appearing per number
   Map<int, int> _ciclosActuales = {}; // current days without appearing
+
+  // Patrones
+  int _puntoMapa = 9; // punto activo en el mapa de afinidad
+  Map<int, Map<int, int>> _coOcurrenciaPuntos = {}; // puntoA → puntoB → días juntos
+  Map<int, int> _diasPorPunto = {};                 // punto → total días que apareció
+  Map<int, Map<int, int>> _siguienteDiaPunto = {};  // puntoHoy → {puntoManiana: count}
+  List<({DateTime fecha, int punto, int veces})> _diasConcentrados = [];
 
   late TabController _tabController;
 
@@ -58,7 +70,8 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   void initState() {
     super.initState();
     _searchController = TextEditingController();
-    _tabController = TabController(length: 5, vsync: this);
+    _paresCtrl = TextEditingController();
+    _tabController = TabController(length: 6, vsync: this);
     _db.addListener(_sincronizar);
     _sincronizar();
   }
@@ -68,6 +81,7 @@ class _AnalisisScreenState extends State<AnalisisScreen>
     _db.removeListener(_sincronizar);
     _tabController.dispose();
     _searchController.dispose();
+    _paresCtrl.dispose();
     super.dispose();
   }
 
@@ -91,31 +105,23 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   void _procesarSorteos(List<SorteoModel> sorteos) {
     final allStats = _computeStats(sorteos);
 
-      final calientes = allStats.values.toList()
-        ..sort((a, b) => b.frecuencia.compareTo(a.frecuencia));
-
-      final frios = allStats.values.where((e) => e.frecuencia > 0).toList()
-        ..sort((a, b) {
-          final d = b.diasSinSalir().compareTo(a.diasSinSalir());
-          return d != 0 ? d : a.frecuencia.compareTo(b.frecuencia);
-        });
-
-      if (mounted) {
-        setState(() {
-          _sorteos = sorteos;
-          _allStats = allStats;
-          _calientes = calientes.take(15).toList();
-          _frios = frios.take(15).toList();
-          _porHorario = _computePorHorario(sorteos);
-          _totalPorDia = _computeTotalPorDia(sorteos);
-          _frecPorDia = _computeFrecPorDia(sorteos);
-          _pares = _computePares(sorteos);
-          _ciclosMax = _computeCiclosMax(allStats);
-          _ciclosActuales = _computeCiclosActuales(allStats);
-          _repetidosMes = _computeRepetidosMes(sorteos);
-          _loading = false;
-        });
-      }
+    final porHorario     = _computePorHorario(sorteos);
+    if (mounted) {
+      setState(() {
+        _sorteos = sorteos;
+        _allStats = allStats;
+        _porHorario = porHorario;
+        _totalPorDia = _computeTotalPorDia(sorteos);
+        _frecPorDia = _computeFrecPorDia(sorteos);
+        _ciclosMax = _computeCiclosMax(allStats);
+        _ciclosActuales = _computeCiclosActuales(allStats);
+        _coOcurrenciaPuntos = _computeCoOcurrenciaPuntos(sorteos);
+        _diasPorPunto       = _computeDiasPorPunto(sorteos);
+        _siguienteDiaPunto  = _computeSiguienteDiaPunto(sorteos);
+        _diasConcentrados   = _computeDiasConcentrados(sorteos);
+        _loading = false;
+      });
+    }
   }
 
   // ── CÓMPUTOS ─────────────────────────────────────────────────────────────────
@@ -125,7 +131,9 @@ class _AnalisisScreenState extends State<AnalisisScreen>
       for (int i = 0; i <= 99; i++) i: EstadisticaNumero(numero: i),
     };
     void proc(int? num, DateTime fecha) {
-      if (num == null || num < 0 || num > 99) return;
+      if (num == null || num < 0 || num > 99) {
+        return;
+      }
       stats[num]!.frecuencia++;
       stats[num]!.apariciones.add(fecha);
       if (stats[num]!.ultimaVez == null ||
@@ -197,6 +205,32 @@ class _AnalisisScreenState extends State<AnalisisScreen>
     };
   }
 
+
+
+  List<SorteoModel> _filtrarPorPeriodo(String periodo) {
+    final ahora = DateTime.now();
+    DateTime inicio;
+    switch (periodo) {
+      case 'mes':       inicio = DateTime(ahora.year, ahora.month, 1);
+      case 'trimestre': final t = (ahora.month - 1) ~/ 3; inicio = DateTime(ahora.year, t * 3 + 1, 1);
+      case 'anio':      inicio = DateTime(ahora.year, 1, 1);
+      default:          return _sorteos;
+    }
+    return _sorteos.where((s) => !s.fecha.isBefore(inicio)).toList();
+  }
+
+  List<MapEntry<int, int>> _computeCompanieros(int numero, List<SorteoModel> sorteos) {
+    final conteo = <int, int>{};
+    for (final s in sorteos) {
+      final nums = [s.numeroManiana, s.numeroTarde, s.numeroNoche].whereType<int>().toList();
+      if (!nums.contains(numero)) continue;
+      for (final n in nums) {
+        if (n != numero) conteo[n] = (conteo[n] ?? 0) + 1;
+      }
+    }
+    return conteo.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+  }
+
   List<MapEntry<String, int>> _computePares(List<SorteoModel> sorteos) {
     final Map<String, int> conteo = {};
     for (final s in sorteos) {
@@ -221,36 +255,14 @@ class _AnalisisScreenState extends State<AnalisisScreen>
         .toList();
   }
 
-
-  List<int> _generarSugerencia() {
-    if (_allStats == null) return [];
-    final ord = _allStats!.values.toList()
-      ..sort((a, b) => b.frecuencia.compareTo(a.frecuencia));
-    final caliente = ord.first.numero;
-    final frios = _allStats!.values.where((e) => e.frecuencia > 0).toList()
-      ..sort((a, b) => b.diasSinSalir().compareTo(a.diasSinSalir()));
-    final frio = frios.isNotEmpty ? frios.first.numero : 50;
-    final medios = ord
-        .where((e) => e.numero != caliente && e.numero != frio)
-        .skip(ord.length ~/ 3)
-        .take(20)
-        .toList();
-    return [caliente, frio, medios.isNotEmpty ? medios.first.numero : 33];
-  }
-
-  // ── RELACIONES PROFUNDAS ──────────────────────────────────────────────────────
-
-
   // ── BUILD ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('🔍 Análisis'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar),
-        ],
+        //title: const Text('🔍 Análisis'),
+        
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppTheme.goldColor,
@@ -262,6 +274,7 @@ class _AnalisisScreenState extends State<AnalisisScreen>
             Tab(icon: Icon(Icons.calendar_view_week_rounded), text: 'Semana'),
             Tab(icon: Icon(Icons.compare_arrows_rounded), text: 'Pares'),
             Tab(icon: Icon(Icons.history_rounded), text: 'Ciclos'),
+            Tab(icon: Icon(Icons.hub_rounded), text: 'Patrones'),
           ],
         ),
       ),
@@ -286,6 +299,7 @@ class _AnalisisScreenState extends State<AnalisisScreen>
                       _buildTabSemana(),
                       _buildTabPares(),
                       _buildTabCiclos(),
+                      _buildTabPatrones(),
                     ],
                   ),
           ),
@@ -322,198 +336,286 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   // ── TAB 1: GENERAL ───────────────────────────────────────────────────────────
 
   Widget _buildTabGeneral() {
-    final faltanMes = _numerosNoSalidosMesActual();
-    final calientesFaltantesMes = _calientes
-        .where((e) => faltanMes.contains(e.numero))
-        .toList();
-    final friosFaltantesMes = _frios
-        .where((e) => faltanMes.contains(e.numero))
-        .toList();
+    if (_allStats == null || _sorteos.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.goldColor));
+    }
+
+    final ahora    = DateTime.now();
+    final inicio30 = ahora.subtract(const Duration(days: 30));
+    final sorteos30 = _sorteos.where((s) => !s.fecha.isBefore(inicio30)).toList();
+    final total    = _sorteos.length;
+    final total30  = sorteos30.length;
+
+    // ── Tendencia 30d ─────────────────────────────────────────────────────────
+    final freq30 = <int, int>{for (int i = 0; i <= 99; i++) i: 0};
+    for (final s in sorteos30) {
+      for (final n in [s.numeroManiana, s.numeroTarde, s.numeroNoche].whereType<int>()) {
+        freq30[n] = freq30[n]! + 1;
+      }
+    }
+
+    final enAlza = <({int n, double ratio})>[];
+    final enBaja = <({int n, double ratio})>[];
+
+    if (total > 0 && total30 > 0) {
+      for (int n = 0; n <= 99; n++) {
+        final histRate = _allStats![n]!.frecuencia / total;
+        if (histRate == 0) continue;
+        final rate30 = freq30[n]! / total30;
+        final ratio  = rate30 / histRate;
+        if (ratio >= 1.5 && freq30[n]! >= 2) enAlza.add((n: n, ratio: ratio));
+        if (ratio <= 0.35 && _allStats![n]!.frecuencia >= 5) enBaja.add((n: n, ratio: ratio));
+      }
+      enAlza.sort((a, b) => b.ratio.compareTo(a.ratio));
+      enBaja.sort((a, b) => a.ratio.compareTo(b.ratio));
+    }
+
+    // ── Números bajo presión ──────────────────────────────────────────────────
+    final topPresion = List.generate(100, (i) => i)
+        .where((n) => (_ciclosMax[n] ?? 0) > 0)
+        .map((n) => (n: n, ratio: (_ciclosActuales[n] ?? 0) / _ciclosMax[n]!))
+        .where((e) => e.ratio >= 0.5)
+        .toList()
+      ..sort((a, b) => b.ratio.compareTo(a.ratio));
+
+    // ── Top del día de semana ─────────────────────────────────────────────────
+    final hoy    = ahora.weekday;
+    final topHoy = _frecPorDia[hoy]?.take(5).toList() ?? [];
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSugerencia(),
-          const SizedBox(height: 20),
+          // ── 1. Presión ────────────────────────────────────────────────────
           _buildSeccionTitle(
-            '🔥 Números Calientes',
-            'Más frecuentes en el historial',
+            '🎯 Bajo presión',
+            'Llevan más tiempo sin salir respecto a su récord personal',
           ),
-          const SizedBox(height: 8),
-          _buildChipList(
-            _filterBySearch(_calientes),
-            AppTheme.accentColor,
-            true,
-            null, // Remove faltantesMes to avoid repetition
+          const SizedBox(height: 10),
+          if (topPresion.isEmpty)
+            const Text('Pocos datos aún', style: TextStyle(color: Colors.grey))
+          else
+            ...topPresion.take(10).map((e) => _buildPresionRow(e.n, e.ratio)),
+          const SizedBox(height: 22),
+
+          // ── 2. Tendencia ─────────────────────────────────────────────────
+          _buildSeccionTitle(
+            '📊 Tendencia 30 días',
+            'Comparado con su promedio histórico',
           ),
-          const SizedBox(height: 20),
-          _buildSeccionTitle('❄️ Números Fríos', 'Llevan más tiempo sin salir'),
-          const SizedBox(height: 8),
-          _buildChipList(
-            _filterBySearch(_frios),
-            Colors.lightBlue,
-            false,
-            null, // Remove faltantesMes
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildTendenciaCol(
+                  '📈 En alza',
+                  enAlza.take(6).toList(),
+                  AppTheme.greenColor,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildTendenciaCol(
+                  '📉 En baja',
+                  enBaja.take(6).toList(),
+                  AppTheme.accentColor,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          if (calientesFaltantesMes.isNotEmpty ||
-              friosFaltantesMes.isNotEmpty) ...[
-            _buildSeccionTitle(
-              '⚠️ Calientes/Fríos faltantes este mes',
-              'Números frecuentes/infrecuentes que no han salido este mes',
+          const SizedBox(height: 22),
+
+          // ── 3. Día de semana ─────────────────────────────────────────────
+          _buildSeccionTitle(
+            '📅 Los de hoy (${_diasNombre[hoy]})',
+            'Números que más salen este día de la semana históricamente',
+          ),
+          const SizedBox(height: 10),
+          if (topHoy.isEmpty)
+            const Text('Sin datos', style: TextStyle(color: Colors.grey))
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: topHoy
+                  .map((e) => _buildMiniNumConFrec(e.key, e.value))
+                  .toList(),
             ),
-            const SizedBox(height: 8),
-            if (calientesFaltantesMes.isNotEmpty) ...[
-              Text(
-                '🔥 Calientes faltantes:',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              _buildChipList(
-                _filterBySearch(calientesFaltantesMes),
-                AppTheme.accentColor,
-                true,
-                null,
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (friosFaltantesMes.isNotEmpty) ...[
-              Text(
-                '❄️ Fríos faltantes:',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              _buildChipList(
-                _filterBySearch(friosFaltantesMes),
-                Colors.lightBlue,
-                false,
-                null,
-              ),
-            ],
-            const SizedBox(height: 20),
-          ],
-          _buildSeccionTitle(
-            '📅 Más repetidos este mes',
-            'Números que más veces han salido en el mes actual',
-          ),
-          const SizedBox(height: 8),
-          _buildChipList(
-            _filterBySearch(_repetidosMes),
-            Colors.orange,
-            true,
-            null,
-          ),
-          const SizedBox(height: 20),
-          _buildSeccionTitle(
-            '🗓️ Números faltantes',
-            'No han salido este año, trimestre o mes actual',
-          ),
-          const SizedBox(height: 8),
-          _buildMissingNumbersSection(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
+
+          // ── 4. Distribución decenas ──────────────────────────────────────
           _buildDistribucionDecenas(),
         ],
       ),
     );
   }
 
-  List<EstadisticaNumero> _filterBySearch(List<EstadisticaNumero> lista) {
-    if (_searchGlobal.isEmpty) return lista;
-    return lista.where((e) {
-      final num = e.numero.toString().padLeft(2, '0');
-      final sig = significadoCorto(e.numero).toLowerCase();
-      return num.contains(_searchGlobal) ||
-          sig.contains(_searchGlobal.toLowerCase());
-    }).toList();
-  }
+  // ── Row de presión ────────────────────────────────────────────────────────
+  Widget _buildPresionRow(int numero, double ratio) {
+    final actual  = _ciclosActuales[numero] ?? 0;
+    final maximo  = _ciclosMax[numero] ?? 1;
+    final pct     = ratio.clamp(0.0, 1.0);
+    final sig     = significadoCorto(numero);
 
-  List<int> _filterMissingBySearch(List<int> lista) {
-    if (_searchGlobal.isEmpty) return lista;
-    return lista.where((n) {
-      final num = n.toString().padLeft(2, '0');
-      final sig = significadoCorto(n).toLowerCase();
-      return num.contains(_searchGlobal) ||
-          sig.contains(_searchGlobal.toLowerCase());
-    }).toList();
-  }
-
-  List<int> _numerosNoSalidosEntre(DateTime inicio, DateTime fin) {
-    final seen = <int>{};
-    for (final s in _sorteos) {
-      if (s.fecha.isBefore(inicio) || s.fecha.isAfter(fin)) continue;
-      seen.addAll(
-        [
-          s.numeroManiana,
-          s.numeroTarde,
-          s.numeroNoche,
-        ].where((n) => n != null).cast<int>(),
-      );
+    final Color color;
+    if (pct >= 0.85) {
+      color = Colors.red;
+    } else if (pct >= 0.65) {
+      color = AppTheme.orangeColor;
+    } else {
+      color = AppTheme.goldColor;
     }
-    return List.generate(
-      100,
-      (i) => i,
-    ).where((n) => !seen.contains(n)).toList();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          // Número
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withOpacity(0.5)),
+            ),
+            child: Center(
+              child: Text(
+                numero.toString().padLeft(2, '0'),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Significado + barra
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(sig,
+                        style: const TextStyle(
+                            fontSize: 11, color: AppTheme.textSecondary)),
+                    const Spacer(),
+                    Text('${actual}d / $maximo d',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: color,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 7,
+                    backgroundColor: AppTheme.cardBorder,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Porcentaje
+          Text(
+            '${(pct * 100).toStringAsFixed(0)}%',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color),
+          ),
+        ],
+      ),
+    );
   }
 
-  List<int> _numerosNoSalidosAnioActual() {
-    final ahora = DateTime.now();
-    final inicio = DateTime(ahora.year, 1, 1);
-    final fin = DateTime(
-      ahora.year + 1,
-      1,
-      1,
-    ).subtract(const Duration(days: 1));
-    return _numerosNoSalidosEntre(inicio, fin);
+  // ── Columna tendencia ─────────────────────────────────────────────────────
+  Widget _buildTendenciaCol(
+      String titulo, List<({int n, double ratio})> items, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(titulo,
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+          const SizedBox(height: 8),
+          if (items.isEmpty)
+            Text('Sin señal',
+                style: TextStyle(
+                    fontSize: 11, color: color.withOpacity(0.5),
+                    fontStyle: FontStyle.italic))
+          else
+            ...items.map((e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      _buildMiniNum(e.n, color),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          significadoCorto(e.n),
+                          style: const TextStyle(
+                              fontSize: 10, color: AppTheme.textSecondary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '×${e.ratio.toStringAsFixed(1)}',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: color),
+                      ),
+                    ],
+                  ),
+                )),
+        ],
+      ),
+    );
   }
 
-  List<int> _numerosNoSalidosTrimestreActual() {
-    final ahora = DateTime.now();
-    final trimestre = ((ahora.month - 1) ~/ 3);
-    final inicio = DateTime(ahora.year, trimestre * 3 + 1, 1);
-    final fin = DateTime(
-      ahora.year,
-      trimestre * 3 + 4,
-      1,
-    ).subtract(const Duration(days: 1));
-    return _numerosNoSalidosEntre(inicio, fin);
-  }
-
-  List<int> _numerosNoSalidosMesActual() {
-    final ahora = DateTime.now();
-    final inicio = DateTime(ahora.year, ahora.month, 1);
-    final fin = DateTime(
-      ahora.year,
-      ahora.month + 1,
-      1,
-    ).subtract(const Duration(days: 1));
-    return _numerosNoSalidosEntre(inicio, fin);
-  }
-
-  List<EstadisticaNumero> _computeRepetidosMes(List<SorteoModel> sorteos) {
-    final ahora = DateTime.now();
-    final inicio = DateTime(ahora.year, ahora.month, 1);
-    final fin = DateTime(ahora.year, ahora.month + 1, 1)
-        .subtract(const Duration(days: 1));
-    final stats = {
-      for (int i = 0; i <= 99; i++) i: EstadisticaNumero(numero: i),
-    };
-    for (final s in sorteos) {
-      if (s.fecha.isBefore(inicio) || s.fecha.isAfter(fin)) continue;
-      for (final num in [s.numeroManiana, s.numeroTarde, s.numeroNoche]) {
-        if (num == null || num < 0 || num > 99) continue;
-        stats[num]!.frecuencia++;
-        stats[num]!.apariciones.add(s.fecha);
-        if (stats[num]!.ultimaVez == null ||
-            s.fecha.isAfter(stats[num]!.ultimaVez!)) {
-          stats[num]!.ultimaVez = s.fecha;
-        }
-      }
-    }
-    return (stats.values.where((e) => e.frecuencia > 0).toList()
-          ..sort((a, b) => b.frecuencia.compareTo(a.frecuencia)))
-        .take(15)
-        .toList();
+  // ── Mini chip con frecuencia ──────────────────────────────────────────────
+  Widget _buildMiniNumConFrec(int numero, int veces) {
+    final sig = significadoCorto(numero);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(numero.toString().padLeft(2, '0'),
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryColor)),
+          Text(sig,
+              style: const TextStyle(fontSize: 8, color: AppTheme.textSecondary),
+              overflow: TextOverflow.ellipsis),
+          Text('$veces×',
+              style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.goldColor)),
+        ],
+      ),
+    );
   }
 
   Map<int, int> _computeCiclosMax(Map<int, EstadisticaNumero> stats) {
@@ -529,25 +631,92 @@ class _AnalisisScreenState extends State<AnalisisScreen>
       final apariciones = (stat.apariciones.toList()..sort()).cast<DateTime>();
       int maxGap = 0;
 
-      // Calcula gap entrada primera aparición
-      if (apariciones.isNotEmpty) {
-        maxGap = apariciones.first.difference(DateTime(2000, 1, 1)).inDays;
-      }
-
-      // Calcula gaps entre apariciones
+      // Solo gaps entre apariciones consecutivas reales
       for (int i = 1; i < apariciones.length; i++) {
         final gap = apariciones[i].difference(apariciones[i - 1]).inDays;
         if (gap > maxGap) maxGap = gap;
       }
 
-      // Calcula gap desde última aparición hasta hoy
-      if (apariciones.isNotEmpty) {
-        final currentGap = DateTime.now().difference(apariciones.last).inDays;
-        if (currentGap > maxGap) maxGap = currentGap;
-      }
-
       result[numero] = maxGap;
     }
+    return result;
+  }
+
+  // ── CÓMPUTOS PATRONES ────────────────────────────────────────────────────────
+
+  /// Para cada par de puntos (A, B), cuántos días aparecieron juntos en el mismo día.
+  Map<int, Map<int, int>> _computeCoOcurrenciaPuntos(List<SorteoModel> sorteos) {
+    final co = <int, Map<int, int>>{
+      for (int i = 0; i <= 18; i++) i: {for (int j = 0; j <= 18; j++) j: 0},
+    };
+    for (final s in sorteos) {
+      final puntos = [s.numeroManiana, s.numeroTarde, s.numeroNoche]
+          .whereType<int>()
+          .map((n) => n ~/ 10 + n % 10)
+          .toSet()
+          .toList();
+      for (int i = 0; i < puntos.length; i++) {
+        for (int j = 0; j < puntos.length; j++) {
+          if (i != j) co[puntos[i]]![puntos[j]] = co[puntos[i]]![puntos[j]]! + 1;
+        }
+      }
+    }
+    return co;
+  }
+
+  /// Total de días en que apareció cada punto.
+  Map<int, int> _computeDiasPorPunto(List<SorteoModel> sorteos) {
+    final r = <int, int>{for (int i = 0; i <= 18; i++) i: 0};
+    for (final s in sorteos) {
+      for (final n in [s.numeroManiana, s.numeroTarde, s.numeroNoche].whereType<int>()) {
+        final p = n ~/ 10 + n % 10;
+        r[p] = r[p]! + 1;
+      }
+    }
+    return r;
+  }
+
+  /// Para cada punto hoy, qué puntos tienden a caer AL DÍA SIGUIENTE.
+  Map<int, Map<int, int>> _computeSiguienteDiaPunto(List<SorteoModel> sorteos) {
+    final r = <int, Map<int, int>>{
+      for (int i = 0; i <= 18; i++) i: {for (int j = 0; j <= 18; j++) j: 0},
+    };
+    final porFecha = <String, SorteoModel>{};
+    for (final s in sorteos) { porFecha[s.fechaKey] = s; }
+    for (final s in sorteos) {
+      final siguiente = DateTime(s.fecha.year, s.fecha.month, s.fecha.day + 1);
+      final sigKey = '${siguiente.year}-${siguiente.month.toString().padLeft(2,'0')}-${siguiente.day.toString().padLeft(2,'0')}';
+      final sig = porFecha[sigKey];
+      if (sig == null) continue;
+      final puntosHoy = [s.numeroManiana, s.numeroTarde, s.numeroNoche]
+          .whereType<int>().map((n) => n ~/ 10 + n % 10).toSet();
+      final puntosSig = [sig.numeroManiana, sig.numeroTarde, sig.numeroNoche]
+          .whereType<int>().map((n) => n ~/ 10 + n % 10).toSet();
+      for (final ph in puntosHoy) {
+        for (final ps in puntosSig) {
+          r[ph]![ps] = r[ph]![ps]! + 1;
+        }
+      }
+    }
+    return r;
+  }
+
+  /// Días donde el mismo punto salió en los 3 sorteos (concentración total).
+  List<({DateTime fecha, int punto, int veces})> _computeDiasConcentrados(List<SorteoModel> sorteos) {
+    final result = <({DateTime fecha, int punto, int veces})>[];
+    for (final s in sorteos) {
+      final nums = [s.numeroManiana, s.numeroTarde, s.numeroNoche].whereType<int>().toList();
+      final puntos = nums.map((n) => n ~/ 10 + n % 10).toList();
+      // Contar apariciones de cada punto ese día
+      final conteo = <int, int>{};
+      for (final p in puntos) { conteo[p] = (conteo[p] ?? 0) + 1; }
+      for (final e in conteo.entries) {
+        if (e.value >= 2) {
+          result.add((fecha: s.fecha, punto: e.key, veces: e.value));
+        }
+      }
+    }
+    result.sort((a, b) => b.fecha.compareTo(a.fecha));
     return result;
   }
 
@@ -849,93 +1018,215 @@ class _AnalisisScreenState extends State<AnalisisScreen>
   // ── TAB 5: PARES ─────────────────────────────────────────────────────────────
 
   Widget _buildTabPares() {
-    if (_pares.isEmpty) {
-      return const Center(
+    final sorteosFiltrados = _filtrarPorPeriodo(_paresPeriodo);
+    final numBuscado = _paresNumBuscado;
+
+    return Column(
+      children: [
+        // Buscador
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: TextField(
+            controller: _paresCtrl,
+            keyboardType: TextInputType.number,
+            maxLength: 2,
+            decoration: InputDecoration(
+              hintText: 'Buscar número para ver sus compañeros...',
+              prefixIcon: const Icon(Icons.search, color: AppTheme.goldColor),
+              suffixIcon: _paresCtrl.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () { _paresCtrl.clear(); setState(() => _paresNumBuscado = null); },
+                    )
+                  : null,
+              counterText: '',
+            ),
+            onChanged: (v) => setState(() => _paresNumBuscado = int.tryParse(v)),
+          ),
+        ),
+        // Selector de período
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final p in [('historico', 'Histórico'), ('mes', 'Mes'), ('trimestre', 'Trimestre'), ('anio', 'Año')])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(p.$2),
+                      selected: _paresPeriodo == p.$1,
+                      onSelected: (_) => setState(() => _paresPeriodo = p.$1),
+                      selectedColor: AppTheme.goldColor.withOpacity(0.25),
+                      labelStyle: TextStyle(
+                        fontSize: 11,
+                        color: _paresPeriodo == p.$1 ? AppTheme.goldColor : Colors.grey,
+                        fontWeight: _paresPeriodo == p.$1 ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        // Lista
+        Expanded(
+          child: numBuscado != null && numBuscado >= 0 && numBuscado <= 99
+              ? _buildCompanierosDeNumero(numBuscado, sorteosFiltrados)
+              : _buildParesGlobales(sorteosFiltrados),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompanierosDeNumero(int numero, List<SorteoModel> sorteos) {
+    final companieros = _computeCompanieros(numero, sorteos);
+    final diasConNumero = sorteos.where((s) =>
+      [s.numeroManiana, s.numeroTarde, s.numeroNoche].contains(numero)).length;
+
+    if (companieros.isEmpty) {
+      return Center(
         child: Text(
-          'Sin datos suficientes',
-          style: TextStyle(color: Colors.grey),
+          'El ${numero.toString().padLeft(2, '0')} no salió en el período seleccionado',
+          style: const TextStyle(color: Colors.grey),
+          textAlign: TextAlign.center,
         ),
       );
     }
 
-    final maxCount = _pares.first.value;
-    return Column(
-      children: [
-        
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(8),
-            itemCount: _pares.length,
-            itemBuilder: (ctx, i) {
-              final entry = _pares[i];
-              final parts = entry.key.split('-');
-              final a = int.parse(parts[0]);
-              final b = int.parse(parts[1]);
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 4),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Row(
+    final maxCount = companieros.first.value;
+    return ListView.builder(
+      padding: const EdgeInsets.all(8),
+      itemCount: companieros.length + 1,
+      itemBuilder: (ctx, i) {
+        if (i == 0) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+            child: Row(
+              children: [
+                _buildMiniNum(numero, AppTheme.goldColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${i + 1}.',
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildMiniNum(a, AppTheme.goldColor),
-                      const SizedBox(width: 4),
-                      const Text('+', style: TextStyle(color: Colors.grey)),
-                      const SizedBox(width: 4),
-                      _buildMiniNum(b, AppTheme.orangeColor),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${significadoCorto(a)} · ${significadoCorto(b)}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(3),
-                              child: LinearProgressIndicator(
-                                value: maxCount > 0
-                                    ? entry.value / maxCount
-                                    : 0,
-                                backgroundColor: Colors.grey.withValues(
-                                  alpha: 0.2,
-                                ),
-                                color: AppTheme.primaryColor,
-                                minHeight: 8,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${entry.value}x',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.goldColor,
+                      Text(significadoCorto(numero),
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.goldColor)),
+                      Text('Salió $diasConNumero veces · ${companieros.length} compañeros distintos',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final entry = companieros[i - 1];
+        final companion = entry.key;
+        final veces = entry.value;
+        final pct = diasConNumero > 0 ? veces / diasConNumero : 0.0;
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              children: [
+                Text('$i.', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                const SizedBox(width: 8),
+                _buildMiniNum(companion, AppTheme.orangeColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(significadoCorto(companion),
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: maxCount > 0 ? veces / maxCount : 0,
+                          backgroundColor: Colors.grey.withOpacity(0.2),
+                          color: AppTheme.primaryColor,
+                          minHeight: 6,
                         ),
                       ),
                     ],
                   ),
                 ),
-              );
-            },
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('${veces}x', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.goldColor)),
+                    Text('${(pct * 100).toStringAsFixed(0)}%', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        );
+      },
+    );
+  }
+
+  Widget _buildParesGlobales(List<SorteoModel> sorteos) {
+    final pares = _computePares(sorteos);
+    if (pares.isEmpty) {
+      return const Center(child: Text('Sin datos suficientes', style: TextStyle(color: Colors.grey)));
+    }
+    final maxCount = pares.first.value;
+    return ListView.builder(
+      padding: const EdgeInsets.all(8),
+      itemCount: pares.length,
+      itemBuilder: (ctx, i) {
+        final entry = pares[i];
+        final parts = entry.key.split('-');
+        final a = int.parse(parts[0]);
+        final b = int.parse(parts[1]);
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 4),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                Text('${i + 1}.', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(width: 8),
+                _buildMiniNum(a, AppTheme.goldColor),
+                const SizedBox(width: 4),
+                const Text('+', style: TextStyle(color: Colors.grey)),
+                const SizedBox(width: 4),
+                _buildMiniNum(b, AppTheme.orangeColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${significadoCorto(a)} · ${significadoCorto(b)}',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: maxCount > 0 ? entry.value / maxCount : 0,
+                          backgroundColor: Colors.grey.withOpacity(0.2),
+                          color: AppTheme.primaryColor,
+                          minHeight: 8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text('${entry.value}x', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.goldColor)),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -961,108 +1252,6 @@ class _AnalisisScreenState extends State<AnalisisScreen>
 
   // ── WIDGETS COMPARTIDOS ──────────────────────────────────────────────────────
 
-  Widget _buildSugerencia() {
-    final sugeridos = _generarSugerencia();
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppTheme.primaryColor, Color(0xFF0a2a5e)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.goldColor.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.lightbulb, color: AppTheme.goldColor),
-              const SizedBox(width: 8),
-              const Text(
-                'Sugerencia del día',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.goldColor,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.goldColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'Estrategia mixta',
-                  style: TextStyle(fontSize: 10, color: AppTheme.goldColor),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (sugeridos.isNotEmpty)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildSugerenciaItem(sugeridos[0], '🔥 Caliente'),
-                _buildSugerenciaItem(sugeridos[1], '❄️ Frío'),
-                _buildSugerenciaItem(sugeridos[2], '⚖️ Medio'),
-              ],
-            )
-          else
-            const Text(
-              'Registra al menos 7 días para ver sugerencias',
-              style: TextStyle(color: Colors.grey),
-            ),
-          
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSugerenciaItem(int numero, String label) => Column(
-    children: [
-      Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-      const SizedBox(height: 6),
-      Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppTheme.goldColor, AppTheme.orangeColor],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.goldColor.withValues(alpha: 0.4),
-              blurRadius: 8,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Center(
-          child: Text(
-            numero.toString().padLeft(2, '0'),
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 4),
-      Text(
-        significadoCorto(numero),
-        style: const TextStyle(fontSize: 10, color: Colors.grey),
-      ),
-    ],
-  );
-
   Widget _buildSeccionTitle(String title, String subtitle) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -1073,353 +1262,6 @@ class _AnalisisScreenState extends State<AnalisisScreen>
       Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
     ],
   );
-
-  Widget _buildChipList(
-    List<EstadisticaNumero> lista,
-    Color color,
-    bool mostrarFrecuencia,
-    Set<int>? faltantesMes,
-  ) {
-    if (lista.isEmpty) {
-      return Card(
-        color: color.withValues(alpha: 0.05),
-        shape: RoundedRectangleBorder(
-          side: BorderSide(color: color.withValues(alpha: 0.2)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(Icons.info, color: color.withValues(alpha: 0.6)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  _searchGlobal.isEmpty
-                      ? 'Sin datos suficientes'
-                      : 'No encontramos números que coincidan con "$_searchGlobal"',
-                  style: TextStyle(
-                    color: color.withValues(alpha: 0.8),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: lista.map((stat) {
-          final sig = significadoCorto(stat.numero);
-          final isCaliente = _calientes.any((e) => e.numero == stat.numero);
-          final isFrio = _frios.any((e) => e.numero == stat.numero);
-          String tipo = '';
-          if (isCaliente) {
-            tipo = '🔥';
-          } else if (isFrio) {
-            tipo = '❄️';
-          }
-          return GestureDetector(
-            onTap: () {
-              final val = stat.numero.toString().padLeft(2, '0');
-              _searchController.text = val;
-              setState(() {
-                _searchGlobal = val;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: color.withValues(alpha: 0.4)),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    stat.numero.toString().padLeft(2, '0'),
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
-                  if (tipo.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      tipo,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: tipo == '🔥'
-                            ? Colors.red
-                            : tipo == '❄️'
-                            ? Colors.blue
-                            : Colors.grey,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 2),
-                  Text(
-                    mostrarFrecuencia
-                        ? '${stat.frecuencia}x'
-                        : '${stat.diasSinSalir()}d',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (sig.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      sig,
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: color.withValues(alpha: 0.7),
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  if (faltantesMes?.contains(stat.numero) ?? false) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      '🚫 Faltante',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.red,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildMissingNumbersSection() {
-    final faltanAnioRaw = _numerosNoSalidosAnioActual();
-    final faltanAnio = _filterMissingBySearch(faltanAnioRaw);
-    final faltanAnioItems = faltanAnio.map((n) {
-      final isCaliente = _calientes.any((e) => e.numero == n);
-      final isFrio = _frios.any((e) => e.numero == n);
-      String tipo = '';
-      String info = '';
-      if (isCaliente) {
-        tipo = '🔥';
-        info = '${_allStats![n]!.frecuencia}x';
-      } else if (isFrio) {
-        tipo = '❄️';
-        info = '${_allStats![n]!.diasSinSalir()}d';
-      }
-      return {'numero': n, 'tipo': tipo, 'info': info};
-    }).toList();
-
-    final faltanTrimestreRaw = _numerosNoSalidosTrimestreActual();
-    final faltanTrimestre = _filterMissingBySearch(faltanTrimestreRaw);
-    final faltanTrimestreItems = faltanTrimestre.map((n) {
-      final isCaliente = _calientes.any((e) => e.numero == n);
-      final isFrio = _frios.any((e) => e.numero == n);
-      String tipo = '';
-      String info = '';
-      if (isCaliente) {
-        tipo = '🔥';
-        info = '${_allStats![n]!.frecuencia}x';
-      } else if (isFrio) {
-        tipo = '❄️';
-        info = '${_allStats![n]!.diasSinSalir()}d';
-      }
-      return {'numero': n, 'tipo': tipo, 'info': info};
-    }).toList();
-
-    // Para mes actual: incluir todos, pero marcar calientes/fríos
-    final faltanMesRaw = _numerosNoSalidosMesActual();
-    final faltanMesItems = faltanMesRaw.map((n) {
-      final isCaliente = _calientes.any((e) => e.numero == n);
-      final isFrio = _frios.any((e) => e.numero == n);
-      String tipo = '';
-      String info = '';
-      if (isCaliente) {
-        tipo = '🔥';
-        info = '${_allStats![n]!.frecuencia}x';
-      } else if (isFrio) {
-        tipo = '❄️';
-        info = '${_allStats![n]!.diasSinSalir()}d';
-      }
-      return {'numero': n, 'tipo': tipo, 'info': info};
-    }).toList();
-
-    // Filtrar por búsqueda
-    final faltanMesFiltered = _searchGlobal.isEmpty
-        ? faltanMesItems
-        : faltanMesItems.where((item) {
-            final n = item['numero'] as int;
-            final num = n.toString().padLeft(2, '0');
-            final sig = significadoCorto(n).toLowerCase();
-            return num.contains(_searchGlobal) ||
-                sig.contains(_searchGlobal.toLowerCase());
-          }).toList();
-
-    if (faltanAnio.isEmpty &&
-        faltanTrimestre.isEmpty &&
-        faltanMesFiltered.isEmpty) {
-      return Card(
-        color: AppTheme.cardColor,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Todos los números han salido este año. ¡Buen trabajo!',
-              ),
-              if (_searchGlobal.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'No hay resultados para "$_searchGlobal".',
-                  style: const TextStyle(color: Colors.grey),
-                ),
-              ],
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (faltanAnio.isNotEmpty) ...[
-          Text(
-            '• Este año: ${faltanAnio.length} números no han salido',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          _buildMissingChips(faltanAnioItems),
-          const SizedBox(height: 14),
-        ],
-        if (faltanTrimestre.isNotEmpty) ...[
-          Text(
-            '• Último trimestre: ${faltanTrimestre.length} números no han salido',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          _buildMissingChips(faltanTrimestreItems),
-          const SizedBox(height: 14),
-        ],
-        if (faltanMesFiltered.isNotEmpty) ...[
-          Text(
-            '• Mes actual: ${faltanMesFiltered.length} números no han salido',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          _buildMissingChips(faltanMesFiltered, maxMostrar: null),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildMissingChips(
-    List<Map<String, dynamic>> items, {
-    int? maxMostrar,
-  }) {
-    final toShow = maxMostrar != null && items.length > maxMostrar
-        ? items.take(maxMostrar).toList()
-        : items;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: toShow.map((item) {
-          final numero = item['numero'] as int;
-          final tipo = item['tipo'] as String;
-          final info = item['info'] as String;
-          final sig = significadoCorto(numero);
-          return GestureDetector(
-            onTap: () {
-              final val = numero.toString().padLeft(2, '0');
-              _searchController.text = val;
-              setState(() {
-                _searchGlobal = val;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.grey.withValues(alpha: 0.4)),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    numero.toString().padLeft(2, '0'),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  if (tipo.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      tipo,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: tipo == '🔥'
-                            ? Colors.red
-                            : tipo == '❄️'
-                            ? Colors.blue
-                            : Colors.grey,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                  if (info.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      info,
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                    ),
-                  ],
-                  const SizedBox(height: 2),
-                  Text(
-                    sig,
-                    style: const TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
 
   Widget _buildDistribucionDecenas() {
     if (_allStats == null) return const SizedBox();
@@ -1486,6 +1328,731 @@ class _AnalisisScreenState extends State<AnalisisScreen>
     );
   }
 
+  // ── TAB 7: PATRONES ──────────────────────────────────────────────────────────
+
+  Widget _buildTabPatrones() {
+    if (_coOcurrenciaPuntos.isEmpty) {
+      return const Center(child: Text('Sin datos', style: TextStyle(color: Colors.grey)));
+    }
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.compare_arrows_rounded, size: 16), text: '¿Juntos?'),
+              Tab(icon: Icon(Icons.calendar_today_rounded, size: 16), text: '¿Qué sigue?'),
+              Tab(icon: Icon(Icons.repeat_rounded, size: 16), text: 'Repetidos'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildPatronMapa(),
+                _buildPatronSiguienteDia(),
+                _buildPatronConcentraciones(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Sub-tab A: Mapa de afinidad / exclusión entre puntos ──────────────────
+
+  Widget _buildPatronLeyenda(Color color, String label) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(width: 8, height: 8,
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+    ],
+  );
+
+  Widget _buildPatronMapa() {
+    return StatefulBuilder(
+      builder: (ctx, setLocal) {
+        final dias = _diasPorPunto[_puntoMapa] ?? 0;
+        if (dias == 0) {
+          return Center(
+            child: Text('El punto ${_puntoMapa.toString().padLeft(2,'0')} no tiene datos',
+                style: TextStyle(color: AppTheme.textSecondary)),
+          );
+        }
+
+        final co = _coOcurrenciaPuntos[_puntoMapa]!;
+        final entries = List.generate(19, (i) => i)
+            .where((i) => i != _puntoMapa)
+            .map((i) => MapEntry(i, co[i] ?? 0))
+            .toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+        final maxCo = entries.isEmpty ? 1 : entries.first.value;
+
+        return Column(
+          children: [
+            // Intro explicativa
+            Container(
+              color: AppTheme.cardColor,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tocá un punto para ver con cuáles suele caer el mismo día y cuáles evita.',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Punto = suma de dígitos del número. Ej: 72 → 7+2 = punto 09.',
+                    style: TextStyle(fontSize: 10, color: AppTheme.textSecondary.withOpacity(0.7)),
+                  ),
+                  const SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: List.generate(19, (i) {
+                        final sel = _puntoMapa == i;
+                        return GestureDetector(
+                          onTap: () => setLocal(() => _puntoMapa = i),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            margin: const EdgeInsets.only(right: 6),
+                            width: 38, height: 38,
+                            decoration: BoxDecoration(
+                              color: sel
+                                  ? AppTheme.primaryColor.withOpacity(0.2)
+                                  : AppTheme.bgDark,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: sel ? AppTheme.primaryColor : AppTheme.cardBorder,
+                                width: sel ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(i.toString().padLeft(2, '0'),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                    color: sel ? AppTheme.primaryColor : AppTheme.textSecondary,
+                                  )),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Resumen del punto seleccionado
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              color: AppTheme.primaryColor.withOpacity(0.12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(_puntoMapa.toString().padLeft(2, '0'),
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryColor)),
+                        Text(significadoCorto(_puntoMapa),
+                            style: TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Apareció $dias veces en el historial',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textPrimary)),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Más frecuente junto a él: ${entries.first.key.toString().padLeft(2,'0')} (${entries.first.value} días)',
+                          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                        ),
+                        Text(
+                          'Menos frecuente: ${entries.last.key.toString().padLeft(2,'0')} (${entries.last.value} días)',
+                          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Leyenda
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+              child: Row(
+                children: [
+                  _buildPatronLeyenda(AppTheme.greenColor, 'Van juntos'),
+                  const SizedBox(width: 12),
+                  _buildPatronLeyenda(AppTheme.goldColor, 'A veces'),
+                  const SizedBox(width: 12),
+                  _buildPatronLeyenda(AppTheme.accentColor, 'Se evitan'),
+                ],
+              ),
+            ),
+
+            // Lista de afinidad
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+                itemCount: entries.length,
+                itemBuilder: (ctx2, i) {
+                  final e = entries[i];
+                  final pct = dias > 0 ? e.value / dias : 0.0;
+                  final color = pct > 0.35
+                      ? AppTheme.greenColor
+                      : pct > 0.18
+                          ? AppTheme.goldColor
+                          : AppTheme.accentColor;
+                  final etiqueta = pct > 0.35
+                      ? 'Van juntos'
+                      : pct > 0.18
+                          ? 'A veces'
+                          : 'Se evitan';
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: AppTheme.cardBorder),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 22,
+                          child: Text('${i+1}.',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 11))),
+                        Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(e.key.toString().padLeft(2,'0'),
+                                style: TextStyle(fontWeight: FontWeight.bold,
+                                    color: color, fontSize: 14)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(significadoCorto(e.key),
+                                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: color.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(etiqueta,
+                                        style: TextStyle(fontSize: 9, color: color,
+                                            fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(3),
+                                child: LinearProgressIndicator(
+                                  value: maxCo > 0 ? e.value / maxCo : 0,
+                                  minHeight: 5,
+                                  backgroundColor: AppTheme.cardBorder,
+                                  color: color.withOpacity(0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('${e.value}d',
+                                style: TextStyle(fontWeight: FontWeight.bold,
+                                    color: color, fontSize: 13)),
+                            Text('${(pct * 100).toStringAsFixed(0)}%',
+                                style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ── Sub-tab B: Al día siguiente ────────────────────────────────────────────
+
+  Widget _buildPatronSiguienteDia() {
+    return StatefulBuilder(
+      builder: (ctx, setLocal) {
+        final puntoHoy = _puntoMapa;
+        final totalDias = _diasPorPunto[puntoHoy] ?? 1;
+        final sig = _siguienteDiaPunto[puntoHoy]!;
+        final entries = List.generate(19, (i) => MapEntry(i, sig[i] ?? 0))
+          ..sort((a, b) => b.value.compareTo(a.value));
+        final maxV = entries.isEmpty ? 1 : entries.first.value;
+
+        return Column(
+          children: [
+            // Intro + selector
+            Container(
+              color: AppTheme.cardColor,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Si hoy cayó este punto, ¿qué punto es más probable mañana?',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: List.generate(19, (i) {
+                        final sel = puntoHoy == i;
+                        return GestureDetector(
+                          onTap: () => setLocal(() => _puntoMapa = i),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            margin: const EdgeInsets.only(right: 6),
+                            width: 38, height: 38,
+                            decoration: BoxDecoration(
+                              color: sel
+                                  ? AppTheme.goldColor.withOpacity(0.2)
+                                  : AppTheme.bgDark,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: sel ? AppTheme.goldColor : AppTheme.cardBorder,
+                                width: sel ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(i.toString().padLeft(2, '0'),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                    color: sel ? AppTheme.goldColor : AppTheme.textSecondary,
+                                  )),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Encabezado con top 3
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              color: AppTheme.goldColor.withOpacity(0.12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.goldColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(puntoHoy.toString().padLeft(2, '0'),
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold,
+                                color: AppTheme.goldColor)),
+                        Icon(Icons.arrow_downward, color: AppTheme.goldColor, size: 12),
+                        Text('HOY', style: TextStyle(fontSize: 8, color: AppTheme.goldColor,
+                            fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Más probable mañana:',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6, runSpacing: 4,
+                          children: entries.take(3).map((e) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.goldColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppTheme.goldColor.withOpacity(0.3)),
+                            ),
+                            child: Text(
+                              '${e.key.toString().padLeft(2,'0')} · ${e.value}x',
+                              style: TextStyle(fontWeight: FontWeight.bold,
+                                  color: AppTheme.goldColor, fontSize: 12),
+                            ),
+                          )).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Leyenda
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+              child: Row(
+                children: [
+                  _buildPatronLeyenda(AppTheme.greenColor, 'Muy probable'),
+                  const SizedBox(width: 12),
+                  _buildPatronLeyenda(AppTheme.goldColor, 'Probable'),
+                  const SizedBox(width: 12),
+                  _buildPatronLeyenda(AppTheme.textSecondary, 'Poco frecuente'),
+                ],
+              ),
+            ),
+
+            // Lista
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+                itemCount: entries.length,
+                itemBuilder: (ctx2, i) {
+                  final e = entries[i];
+                  final pct = totalDias > 0 ? e.value / totalDias : 0.0;
+                  final color = pct > 0.3
+                      ? AppTheme.greenColor
+                      : pct > 0.15
+                          ? AppTheme.goldColor
+                          : AppTheme.textSecondary;
+                  final etiqueta = pct > 0.3
+                      ? 'Muy probable'
+                      : pct > 0.15
+                          ? 'Probable'
+                          : 'Poco frecuente';
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: AppTheme.cardBorder),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 22,
+                            child: Text('${i+1}.',
+                                style: TextStyle(color: AppTheme.textSecondary, fontSize: 11))),
+                        Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(e.key.toString().padLeft(2,'0'),
+                                style: TextStyle(fontWeight: FontWeight.bold,
+                                    color: color, fontSize: 14)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(significadoCorto(e.key),
+                                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: color.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(etiqueta,
+                                        style: TextStyle(fontSize: 9, color: color,
+                                            fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(3),
+                                child: LinearProgressIndicator(
+                                  value: maxV > 0 ? e.value / maxV : 0,
+                                  minHeight: 5,
+                                  backgroundColor: AppTheme.cardBorder,
+                                  color: color.withOpacity(0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('${e.value}x',
+                                style: TextStyle(fontWeight: FontWeight.bold,
+                                    color: color, fontSize: 13)),
+                            Text('${(pct * 100).toStringAsFixed(0)}%',
+                                style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ── Sub-tab C: Días concentrados ───────────────────────────────────────────
+
+  Widget _buildBadgeConc({required int veces, required bool esTriple}) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: esTriple
+          ? AppTheme.accentColor.withOpacity(0.18)
+          : AppTheme.orangeColor.withOpacity(0.15),
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Text('$veces × ${esTriple ? 'triple' : 'doble'}',
+        style: TextStyle(
+            fontSize: 10,
+            color: esTriple ? AppTheme.accentColor : AppTheme.orangeColor,
+            fontWeight: FontWeight.bold)),
+  );
+
+  Widget _buildPatronConcentraciones() {
+    if (_diasConcentrados.isEmpty) {
+      return Center(
+        child: Text('No hay días con punto repetido 2+ veces',
+            style: TextStyle(color: AppTheme.textSecondary)),
+      );
+    }
+
+    final porPunto = <int, List<({DateTime fecha, int veces})>>{};
+    for (final d in _diasConcentrados) {
+      porPunto.putIfAbsent(d.punto, () => []).add((fecha: d.fecha, veces: d.veces));
+    }
+    final ranking = porPunto.entries.toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+
+    const fmt = 'd MMM yy';
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        // Explicación con ejemplo concreto
+        Container(
+          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.cardBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.info_outline, size: 14, color: AppTheme.primaryColor),
+                  const SizedBox(width: 8),
+                  Text('¿Qué son los "repetidos"?',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Es cuando el mismo punto cayó en 2 o 3 sorteos del mismo día '
+                '(mañana, tarde, noche). Un doble es 2 veces, un triple es las 3.',
+                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Ejemplo: si cayeron 72, 45 y 27 en el mismo día, todos tienen punto 09 '
+                  '(7+2=9, 4+5=9, 2+7=9) — eso sería un triple del punto 09.',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary,
+                      fontStyle: FontStyle.italic),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Cuando un punto se concentra, suele tardar varios días en repetirse.',
+                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+        ),
+
+        // Leyenda
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                _buildBadgeConc(veces: 0, esTriple: true),
+                const SizedBox(width: 6),
+                Text('= los 3 sorteos del día', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+              ]),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                _buildBadgeConc(veces: 0, esTriple: false),
+                const SizedBox(width: 6),
+                Text('= 2 de 3 sorteos', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+              ]),
+            ],
+          ),
+        ),
+
+        // Ranking
+        _buildSeccionTitle('Ranking de concentración', '¿Qué punto se repite más en un mismo día?'),
+        const SizedBox(height: 10),
+        ...ranking.take(10).map((e) {
+          final p = e.key;
+          final ocurrencias = e.value;
+          final triples = ocurrencias.where((o) => o.veces == 3).length;
+          final dobles  = ocurrencias.where((o) => o.veces == 2).length;
+          final ultimo  = ocurrencias.first.fecha;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.cardColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.cardBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Center(
+                        child: Text(p.toString().padLeft(2,'0'),
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryColor)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(significadoCorto(p),
+                              style: TextStyle(fontSize: 12, color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 6,
+                            children: [
+                              if (triples > 0) _buildBadgeConc(veces: triples, esTriple: true),
+                              if (dobles > 0) _buildBadgeConc(veces: dobles, esTriple: false),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('${ocurrencias.length} días',
+                            style: TextStyle(fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryColor, fontSize: 14)),
+                        Text('Último: ${DateFormat(fmt, 'es').format(ultimo)}',
+                            style: TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: ocurrencias.take(8).map((o) => Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: o.veces == 3
+                            ? AppTheme.accentColor.withOpacity(0.12)
+                            : AppTheme.orangeColor.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(
+                          color: o.veces == 3
+                              ? AppTheme.accentColor.withOpacity(0.35)
+                              : AppTheme.orangeColor.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(o.veces == 3 ? '●●●' : '●●',
+                              style: TextStyle(fontSize: 8,
+                                  color: o.veces == 3 ? AppTheme.accentColor : AppTheme.orangeColor)),
+                          const SizedBox(width: 4),
+                          Text(DateFormat(fmt, 'es').format(o.fecha),
+                              style: TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
+                        ],
+                      ),
+                    )).toList(),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   // ── TAB 5: CICLOS ──────────────────────────────────────────────────────────
 
   Widget _buildTabCiclos() {
@@ -1493,156 +2060,314 @@ class _AnalisisScreenState extends State<AnalisisScreen>
       return const Center(child: Text('No hay datos de ciclos'));
     }
 
-    // Ordena por % de ciclo actual vs máximo (descendente)
-    final numeros = List<int>.generate(100, (i) => i);
-    numeros.sort((a, b) {
-      final maxA = _ciclosMax[a] ?? 1;
-      final actualA = _ciclosActuales[a] ?? 0;
-      final pctA = actualA / (maxA > 0 ? maxA : 1);
+    // Build sorted list with pressure data
+    final todos = List.generate(100, (i) {
+      final max    = _ciclosMax[i] ?? 0;
+      final actual = _ciclosActuales[i] ?? 0;
+      final pct    = max > 0 ? (actual / max).clamp(0.0, 1.0) : 0.0;
+      return (n: i, max: max, actual: actual, pct: pct);
+    })..sort((a, b) => b.pct.compareTo(a.pct));
 
-      final maxB = _ciclosMax[b] ?? 1;
-      final actualB = _ciclosActuales[b] ?? 0;
-      final pctB = actualB / (maxB > 0 ? maxB : 1);
+    final criticos     = todos.where((e) => e.pct >= 0.85).toList();
+    final observacion  = todos.where((e) => e.pct >= 0.60 && e.pct < 0.85).toList();
+    final normales     = todos.where((e) => e.pct < 0.60 && e.max > 0).toList();
 
-      return pctB.compareTo(pctA);
-    });
+    return _CiclosTabView(
+      criticos: criticos,
+      observacion: observacion,
+      normales: normales,
+    );
+  }
+}
+
+// ── _CiclosTabView ─────────────────────────────────────────────────────────────
+
+typedef _CicloEntry = ({int n, int max, int actual, double pct});
+
+class _CiclosTabView extends StatefulWidget {
+  final List<_CicloEntry> criticos;
+  final List<_CicloEntry> observacion;
+  final List<_CicloEntry> normales;
+
+  const _CiclosTabView({
+    required this.criticos,
+    required this.observacion,
+    required this.normales,
+  });
+
+  @override
+  State<_CiclosTabView> createState() => _CiclosTabViewState();
+}
+
+class _CiclosTabViewState extends State<_CiclosTabView> {
+  bool _mostrarNormales = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final criticos    = widget.criticos;
+    final observacion = widget.observacion;
+    final normales    = widget.normales;
+    final total       = criticos.length + observacion.length + normales.length;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '♻️ Análisis de Ciclos',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+          // ── Resumen rápido ─────────────────────────────────────────────────
+          Row(
+            children: [
+              _buildResumenChip(
+                '🔴 ${criticos.length}',
+                'Críticos',
+                Colors.red,
+              ),
+              const SizedBox(width: 8),
+              _buildResumenChip(
+                '🟠 ${observacion.length}',
+                'En obs.',
+                AppTheme.orangeColor,
+              ),
+              const SizedBox(width: 8),
+              _buildResumenChip(
+                '🟢 ${normales.length}',
+                'Normales',
+                AppTheme.greenColor,
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'Seguimiento de máximas ausencias y ciclos actuales',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+          const SizedBox(height: 6),
+          Text(
+            '$total números con historial · ordenados por presión',
+            style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary),
           ),
-          const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 5,
-              childAspectRatio: 0.9,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
+          const SizedBox(height: 20),
+
+          // ── Zona crítica ───────────────────────────────────────────────────
+          _buildCicloSeccion(
+            icon: Icons.warning_amber_rounded,
+            titulo: 'Zona crítica',
+            subtitulo: '≥ 85% del récord personal sin salir',
+            color: Colors.red,
+            items: criticos,
+            modo: _ModoCard.grande,
+          ),
+
+          // ── En observación ─────────────────────────────────────────────────
+          if (observacion.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            _buildCicloSeccion(
+              icon: Icons.visibility_rounded,
+              titulo: 'En observación',
+              subtitulo: '60 – 84% · acercándose al máximo',
+              color: AppTheme.orangeColor,
+              items: observacion,
+              modo: _ModoCard.compacto,
             ),
-            itemCount: 100,
-            itemBuilder: (ctx, i) {
-              final n = numeros[i];
-              final maxDias = _ciclosMax[n] ?? 0;
-              final actualDias = _ciclosActuales[n] ?? 0;
-              final pct = maxDias > 0 ? (actualDias / maxDias) : 0.0;
+          ],
 
-              Color bgColor;
-              if (pct > 0.8) {
-                bgColor = Colors.red.withOpacity(0.2);
-              } else if (pct > 0.6) {
-                bgColor = Colors.orange.withOpacity(0.2);
-              } else {
-                bgColor = Colors.green.withOpacity(0.2);
-              }
-
-              Color borderColor;
-              if (pct > 0.8) {
-                borderColor = Colors.red;
-              } else if (pct > 0.6) {
-                borderColor = Colors.orange;
-              } else {
-                borderColor = Colors.green;
-              }
-
-              return Container(
+          // ── Normales (colapsable) ──────────────────────────────────────────
+          if (normales.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            GestureDetector(
+              onTap: () => setState(() => _mostrarNormales = !_mostrarNormales),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: bgColor,
-                  border: Border.all(color: borderColor, width: 1.5),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppTheme.cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.cardBorder),
                 ),
-                padding: const EdgeInsets.all(6),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Row(
                   children: [
-                    Text(
-                      n.toString().padLeft(2, '0'),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.greenColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.check_circle_outline_rounded,
+                          color: AppTheme.greenColor, size: 16),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Dentro del ciclo normal',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textPrimary)),
+                          Text('${normales.length} números · < 60% de presión',
+                              style: const TextStyle(
+                                  fontSize: 11, color: AppTheme.textSecondary)),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${actualDias}d',
-                      style: TextStyle(fontSize: 10, color: borderColor),
+                    Icon(
+                      _mostrarNormales
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      color: AppTheme.textSecondary,
                     ),
-                    Text(
-                      'max:${maxDias}d',
-                      style: const TextStyle(fontSize: 8, color: Colors.grey),
+                  ],
+                ),
+              ),
+            ),
+            if (_mostrarNormales) ...[
+              const SizedBox(height: 8),
+              ...normales.map((e) => _buildCicloRow(e, AppTheme.greenColor)),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResumenChip(String valor, String label, Color color) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.09),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(valor,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: color)),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 10, color: AppTheme.textSecondary)),
+        ],
+      ),
+    ),
+  );
+
+  Widget _buildCicloSeccion({
+    required IconData icon,
+    required String titulo,
+    required String subtitulo,
+    required Color color,
+    required List<_CicloEntry> items,
+    required _ModoCard modo,
+  }) {
+    if (items.isEmpty) return const SizedBox();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 16),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(titulo,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: color)),
+                Text(subtitulo,
+                    style: const TextStyle(
+                        fontSize: 11, color: AppTheme.textSecondary)),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (modo == _ModoCard.grande)
+          ...items.map((e) => _buildCicloCard(e, color))
+        else
+          ...items.map((e) => _buildCicloRow(e, color)),
+      ],
+    );
+  }
+
+  // ── Tarjeta grande (zona crítica) ──────────────────────────────────────────
+  Widget _buildCicloCard(_CicloEntry e, Color color) {
+    final sig = significadoCorto(e.n);
+    final pct = e.pct.clamp(0.0, 1.0);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          // Número badge
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: color.withOpacity(0.5)),
+            ),
+            child: Center(
+              child: Text(
+                e.n.toString().padLeft(2, '0'),
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: color),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(sig,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary)),
                     ),
-                    const SizedBox(height: 2),
                     Text(
                       '${(pct * 100).toStringAsFixed(0)}%',
                       style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        color: borderColor,
-                      ),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: color),
                     ),
                   ],
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.withOpacity(0.3)),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 8,
+                    backgroundColor: AppTheme.cardBorder,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 Text(
-                  '📊 Leyenda',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-                SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '🟢 < 60%: Dentro del ciclo normal',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '🟡 60-80%: Aproximándose a máximo',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '🔴 > 80%: En zona de riesgo (puede romper récord)',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ],
+                  'Sin salir ${e.actual}d · récord ${e.max}d',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: color,
+                      fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -1652,4 +2377,79 @@ class _AnalisisScreenState extends State<AnalisisScreen>
     );
   }
 
+  // ── Fila compacta (observación / normales) ─────────────────────────────────
+  Widget _buildCicloRow(_CicloEntry e, Color color) {
+    final pct = e.pct.clamp(0.0, 1.0);
+    final sig = significadoCorto(e.n);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                e.n.toString().padLeft(2, '0'),
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: color),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(sig,
+                    style: const TextStyle(
+                        fontSize: 10, color: AppTheme.textSecondary),
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 3),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 5,
+                    backgroundColor: AppTheme.cardBorder,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('${e.actual}d / ${e.max}d',
+                  style: TextStyle(
+                      fontSize: 9,
+                      color: color,
+                      fontWeight: FontWeight.w600)),
+              Text('${(pct * 100).toStringAsFixed(0)}%',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: color)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
+
+enum _ModoCard { grande, compacto }

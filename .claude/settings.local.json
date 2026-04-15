@@ -13,7 +13,8 @@
       "Bash(python -c \"import json; print\\(''json ok''\\)\")",
       "Bash(python analisis_patrones.py)",
       "Bash(python -X utf8 analisis_patrones.py)",
-      "Bash(dart analyze:*)"
+      "Bash(dart analyze:*)",
+      "Bash(grep -n \"Colors\\\\.grey\\\\|Colors\\\\.black\\\\|Colors\\\\.white\\\\|Colors\\\\.red\" c:/DATA/DEVELOPMENT/Flutter/loto_honduras/lib/screens/*.dart)"
     ]
   }
 }

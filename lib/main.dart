@@ -29,7 +29,7 @@ class LotoHondurasApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Loto Honduras - La Diaria',
+      title: '',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: const HomeScreen(),

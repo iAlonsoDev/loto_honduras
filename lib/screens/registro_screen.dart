@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../data/libro_suenos.dart';
 import '../models/sorteo_model.dart';
 import '../services/database.dart';
 import '../theme/app_theme.dart';
@@ -15,60 +16,74 @@ class RegistroScreen extends StatefulWidget {
 }
 
 class _RegistroScreenState extends State<RegistroScreen> {
-  final _db = DatabaseService.instance;
+  final _db      = DatabaseService.instance;
   final _formKey = GlobalKey<FormState>();
 
   final _manianaCtrl = TextEditingController();
-  final _tardeCtrl = TextEditingController();
-  final _nocheCtrl = TextEditingController();
-  final _notasCtrl = TextEditingController();
+  final _tardeCtrl   = TextEditingController();
+  final _nocheCtrl   = TextEditingController();
 
-  DateTime _fechaSeleccionada = DateTime.now();
-  bool _guardando = false;
+  final _manianFocus = FocusNode();
+  final _tardeFocus  = FocusNode();
+  final _nocheFocus  = FocusNode();
 
+  DateTime _fecha     = DateTime.now();
+  bool     _guardando = false;
 
   @override
   void initState() {
     super.initState();
-    _cargarSorteoExistente();
+    // Auto-avance al completar 2 dígitos
+    _manianaCtrl.addListener(() => _autoAvanzar(_manianaCtrl, _tardeFocus));
+    _tardeCtrl  .addListener(() => _autoAvanzar(_tardeCtrl,   _nocheFocus));
+    // Al completar Noche solo cierra teclado
+    _nocheCtrl  .addListener(() => _autoAvanzar(_nocheCtrl,   null));
+    _cargarExistente();
   }
 
-  void _cargarSorteoExistente() {
-    final sorteo = _db.buscarPorFecha(_fechaSeleccionada);
-    if (mounted) {
-      setState(() {
-        if (sorteo != null) {
-          _manianaCtrl.text = sorteo.numeroManiana == null
-              ? ''
-              : sorteo.numeroManiana!.toString().padLeft(2, '0');
-          _tardeCtrl.text = sorteo.numeroTarde == null
-              ? ''
-              : sorteo.numeroTarde!.toString().padLeft(2, '0');
-          _nocheCtrl.text = sorteo.numeroNoche == null
-              ? ''
-              : sorteo.numeroNoche!.toString().padLeft(2, '0');
-          _notasCtrl.text = sorteo.notas;
-        } else {
-          _manianaCtrl.clear();
-          _tardeCtrl.clear();
-          _nocheCtrl.clear();
-          _notasCtrl.clear();
-        }
-      });
+  // ── Lógica ────────────────────────────────────────────────────────────────
+
+  void _autoAvanzar(TextEditingController ctrl, FocusNode? siguiente) {
+    if (ctrl.text.length == 2) {
+      if (siguiente != null) {
+        FocusScope.of(context).requestFocus(siguiente);
+      } else {
+        FocusScope.of(context).unfocus();
+      }
     }
+  }
+
+  void _cargarExistente() {
+    final s = _db.buscarPorFecha(_fecha);
+    if (!mounted) return;
+    setState(() {
+      _manianaCtrl.text = s?.numeroManiana != null
+          ? s!.numeroManiana!.toString().padLeft(2, '0') : '';
+      _tardeCtrl.text   = s?.numeroTarde   != null
+          ? s!.numeroTarde!.toString().padLeft(2, '0')   : '';
+      _nocheCtrl.text   = s?.numeroNoche   != null
+          ? s!.numeroNoche!.toString().padLeft(2, '0')   : '';
+    });
+  }
+
+  void _cambiarDia(int delta) {
+    final nueva = _fecha.add(Duration(days: delta));
+    if (nueva.isAfter(DateTime.now())) return;
+    setState(() => _fecha = nueva);
+    _cargarExistente();
   }
 
   Future<void> _seleccionarFecha() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _fechaSeleccionada,
+      initialDate: _fecha,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: AppTheme.goldColor,
-            onPrimary: Colors.black,
+          colorScheme: ColorScheme.light(
+            primary: AppTheme.primaryColor,
+            onPrimary: Colors.white,
             surface: AppTheme.cardColor,
           ),
         ),
@@ -76,37 +91,28 @@ class _RegistroScreenState extends State<RegistroScreen> {
       ),
     );
     if (picked != null) {
-      setState(() => _fechaSeleccionada = picked);
-      _cargarSorteoExistente();
+      setState(() => _fecha = picked);
+      _cargarExistente();
     }
   }
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _guardando = true);
-
     try {
-      final sorteo = SorteoModel(
+      await _db.guardarSorteo(SorteoModel(
         id: '',
-        fecha: _fechaSeleccionada,
-        numeroManiana: _manianaCtrl.text.isEmpty
-            ? null
-            : int.parse(_manianaCtrl.text),
-        numeroTarde: _tardeCtrl.text.isEmpty
-            ? null
-            : int.parse(_tardeCtrl.text),
-        numeroNoche: _nocheCtrl.text.isEmpty
-            ? null
-            : int.parse(_nocheCtrl.text),
-        notas: _notasCtrl.text,
-      );
-      await _db.guardarSorteo(sorteo);
-      _cargarSorteoExistente();
-
+        fecha: _fecha,
+        numeroManiana: _manianaCtrl.text.isEmpty ? null : int.parse(_manianaCtrl.text),
+        numeroTarde:   _tardeCtrl.text.isEmpty   ? null : int.parse(_tardeCtrl.text),
+        numeroNoche:   _nocheCtrl.text.isEmpty   ? null : int.parse(_nocheCtrl.text),
+        notas: '',
+      ));
+      _cargarExistente();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Sorteo guardado correctamente'),
+            content: Text('✅ Registrado correctamente'),
             backgroundColor: AppTheme.greenColor,
           ),
         );
@@ -122,221 +128,307 @@ class _RegistroScreenState extends State<RegistroScreen> {
     }
   }
 
-
-
-
   String? _validarNumero(String? value) {
-    if (value == null || value.isEmpty) return null; // Permitir vacío
+    if (value == null || value.isEmpty) return null;
     final n = int.tryParse(value);
-    if (n == null || n < 0 || n > 99) return 'Debe ser entre 00 y 99';
+    if (n == null || n < 0 || n > 99) return '00–99';
     return null;
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final fechaStr = DateFormat(
-      'EEEE d MMM yyyy',
-      'es',
-    ).format(_fechaSeleccionada);
-    final esHoy =
-        DateFormat('yyyy-MM-dd').format(_fechaSeleccionada) ==
-        DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final esHoy = DateUtils.isSameDay(_fecha, DateTime.now());
+    final fechaStr = DateFormat('EEE d MMM yyyy', 'es').format(_fecha);
+    final puedeSiguiente = !esHoy;
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 140,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: _buildAppBarBg(),
-              title: Text(
-                'La Diaria · Loto Honduras',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-              centerTitle: true,
+      appBar: AppBar(),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            // ── Selector de fecha con flechas ──────────────────────────────
+            _buildFechaSelector(fechaStr, esHoy, puedeSiguiente),
+            const SizedBox(height: 20),
+
+            // ── Tres slots ─────────────────────────────────────────────────
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSlot(
+                  emoji: '🌅', hora: '11 AM', label: 'Mañana',
+                  color: AppTheme.goldColor,
+                  controller: _manianaCtrl, focusNode: _manianFocus,
+                ),
+                const SizedBox(width: 10),
+                _buildSlot(
+                  emoji: '☀️', hora: '3 PM', label: 'Tarde',
+                  color: AppTheme.orangeColor,
+                  controller: _tardeCtrl, focusNode: _tardeFocus,
+                ),
+                const SizedBox(width: 10),
+                _buildSlot(
+                  emoji: '🌙', hora: '9 PM', label: 'Noche',
+                  color: AppTheme.primaryColor,
+                  controller: _nocheCtrl, focusNode: _nocheFocus,
+                ),
+              ],
             ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Selector de fecha
-                    _buildFechaSelector(fechaStr, esHoy),
-                    const SizedBox(height: 12),
+            const SizedBox(height: 24),
 
-                    // Campos de números
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildSectionTitle('Números del sorteo'),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildNumeroField(
-                      controller: _manianaCtrl,
-                      label: '🌅 Sorteo Mañana (11:00 AM)',
-                      color: AppTheme.goldColor,
-                      enabled: true,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildNumeroField(
-                      controller: _tardeCtrl,
-                      label: '☀️ Sorteo Tarde (3:00 PM)',
-                      color: AppTheme.orangeColor,
-                      enabled: true,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildNumeroField(
-                      controller: _nocheCtrl,
-                      label: '🌙 Sorteo Noche (9:00 PM)',
-                      color: Colors.purple,
-                      enabled: true,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Botón guardar
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _guardando ? null : _guardar,
-                        icon: _guardando
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.save_rounded),
-                        label: Text(
-                          _guardando
-                              ? 'Guardando...'
-                              : 'Guardar/Actualizar Sorteo',
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+            // ── Botón guardar ──────────────────────────────────────────────
+            SizedBox(
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _guardando ? null : _guardar,
+                icon: _guardando
+                    ? const SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.save_rounded),
+                label: Text(_guardando ? 'Guardando...' : 'Guardar / Actualizar'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAppBarBg() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppTheme.primaryColor, AppTheme.bgDark],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: const Center(
-        child: Icon(Icons.casino_rounded, size: 48, color: AppTheme.goldColor),
-      ),
-    );
-  }
-
-  Widget _buildFechaSelector(String fechaStr, bool esHoy) {
-    return GestureDetector(
-      onTap: _seleccionarFecha,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppTheme.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.primaryColor.withOpacity(0.5)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.calendar_today, color: AppTheme.goldColor),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    esHoy ? 'HOY' : 'Fecha seleccionada',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  Text(
-                    fechaStr,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.edit_calendar, color: Colors.grey, size: 18),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: Colors.white70,
+  // ── Fecha con flechas ─────────────────────────────────────────────────────
+  Widget _buildFechaSelector(String fechaStr, bool esHoy, bool puedeSiguiente) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: esHoy ? AppTheme.goldColor.withOpacity(0.5) : AppTheme.cardBorder,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryColor.withOpacity(0.06),
+            blurRadius: 8, offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // ← anterior
+          _fechaBtn(Icons.chevron_left_rounded, () => _cambiarDia(-1)),
+
+          // Centro: icono + texto (tappable para datepicker)
+          Expanded(
+            child: GestureDetector(
+              onTap: _seleccionarFecha,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppTheme.goldColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.calendar_today_rounded,
+                          color: AppTheme.goldColor, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          esHoy ? 'HOY' : 'Fecha seleccionada',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: esHoy ? AppTheme.goldColor : Colors.grey,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          fechaStr,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // → siguiente (deshabilitado si es hoy)
+          _fechaBtn(
+            Icons.chevron_right_rounded,
+            puedeSiguiente ? () => _cambiarDia(1) : null,
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildNumeroField({
-    required TextEditingController controller,
+  Widget _fechaBtn(IconData icon, VoidCallback? onTap) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          child: Icon(
+            icon,
+            size: 22,
+            color: onTap != null ? AppTheme.textSecondary : AppTheme.cardBorder,
+          ),
+        ),
+      );
+
+  // ── Slot de número ────────────────────────────────────────────────────────
+  Widget _buildSlot({
+    required String emoji,
+    required String hora,
     required String label,
     required Color color,
-    bool enabled = true,
+    required TextEditingController controller,
+    required FocusNode focusNode,
   }) {
-    return TextFormField(
-      controller: controller,
-      enabled: enabled,
-      validator: enabled ? _validarNumero : null,
-      keyboardType: TextInputType.number,
-      maxLength: 2,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
-      decoration: InputDecoration(
-        labelText: label,
-        counterText: '',
-        filled: true,
-        fillColor: AppTheme.cardColor,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: color.withOpacity(0.3)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: color, width: 2),
-        ),
-        prefixIcon: Icon(Icons.tag, color: color),
-        suffix: Text(
-          '(00-99)',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).requestFocus(focusNode),
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (_, _) {
+            final texto = controller.text;
+            final numero = int.tryParse(texto);
+            final sig = numero != null ? significadoCorto(numero) : null;
+            final suma = numero != null
+                ? (numero ~/ 10 + numero % 10).toString().padLeft(2, '0')
+                : null;
+            final lleno = texto.length == 2 && numero != null;
+
+            return Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.cardColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: lleno ? color.withOpacity(0.6) : color.withOpacity(0.3),
+                  width: lleno ? 1.5 : 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(lleno ? 0.12 : 0.05),
+                    blurRadius: 8, offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 20)),
+                  const SizedBox(height: 2),
+                  Text(label,
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+                  Text(hora,
+                      style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                  const SizedBox(height: 8),
+
+                  // Campo número
+                  TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    validator: _validarNumero,
+                    keyboardType: TextInputType.number,
+                    maxLength: 2,
+                    textAlign: TextAlign.center,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.next,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      letterSpacing: 2,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '--',
+                      hintStyle: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: color.withOpacity(0.22),
+                        letterSpacing: 2,
+                      ),
+                      counterText: '',
+                      filled: true,
+                      fillColor: color.withOpacity(0.06),
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10, horizontal: 4),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: color.withOpacity(0.2)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: color.withOpacity(0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: color, width: 2),
+                      ),
+                      errorStyle: const TextStyle(fontSize: 9, height: 1),
+                    ),
+                  ),
+
+                  // ── Preview significado ──────────────────────────────
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: sig != null
+                        ? Padding(
+                            key: ValueKey(numero),
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Column(
+                              children: [
+                                Text(
+                                  '=$suma',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: color,
+                                  ),
+                                ),
+                                Text(
+                                  sig,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: color.withOpacity(0.75),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          )
+                        : const SizedBox(key: ValueKey('empty'), height: 0),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -347,7 +439,9 @@ class _RegistroScreenState extends State<RegistroScreen> {
     _manianaCtrl.dispose();
     _tardeCtrl.dispose();
     _nocheCtrl.dispose();
-    _notasCtrl.dispose();
+    _manianFocus.dispose();
+    _tardeFocus.dispose();
+    _nocheFocus.dispose();
     super.dispose();
   }
 }

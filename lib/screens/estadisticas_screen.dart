@@ -8,6 +8,17 @@ import '../data/libro_suenos.dart';
 
 enum _Periodo { mes, trimestre, anio, todo }
 
+extension _PeriodoLabel on _Periodo {
+  String get label {
+    switch (this) {
+      case _Periodo.mes:       return '30d';
+      case _Periodo.trimestre: return '90d';
+      case _Periodo.anio:      return '365d';
+      case _Periodo.todo:      return 'Todo';
+    }
+  }
+}
+
 class EstadisticasScreen extends StatefulWidget {
   const EstadisticasScreen({super.key});
 
@@ -62,12 +73,11 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
     DateTime inicio;
     switch (_periodo) {
       case _Periodo.mes:
-        inicio = DateTime(ahora.year, ahora.month, 1);
+        inicio = ahora.subtract(const Duration(days: 30));
       case _Periodo.trimestre:
-        final t = ((ahora.month - 1) ~/ 3);
-        inicio = DateTime(ahora.year, t * 3 + 1, 1);
+        inicio = ahora.subtract(const Duration(days: 90));
       case _Periodo.anio:
-        inicio = DateTime(ahora.year, 1, 1);
+        inicio = ahora.subtract(const Duration(days: 365));
       case _Periodo.todo:
         inicio = DateTime(2000);
     }
@@ -123,10 +133,6 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('📊 Estadísticas'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _refrescar),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(96),
           child: Column(
@@ -181,12 +187,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
   // ── SELECTOR DE PERÍODO ───────────────────────────────────────────────────────
 
   Widget _buildPeriodoSelector() {
-    final opciones = [
-      (_Periodo.mes, 'Mes'),
-      (_Periodo.trimestre, 'Trimestre'),
-      (_Periodo.anio, 'Año'),
-      (_Periodo.todo, 'Todo'),
-    ];
+    final opciones = _Periodo.values.map((p) => (p, p.label)).toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Row(
@@ -217,7 +218,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
                       fontSize: 12,
                       fontWeight:
                           selected ? FontWeight.bold : FontWeight.normal,
-                      color: selected ? Colors.black : Colors.grey,
+                      color: selected ? AppTheme.textPrimary : Colors.grey,
                     ),
                   ),
                 ),
@@ -303,7 +304,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
                 '❄️',
                 'Sin salir',
                 '$sinSalir',
-                Colors.lightBlue,
+                AppTheme.greenColor,
               ),
               const SizedBox(width: 8),
               _buildKpiCard(
@@ -406,10 +407,10 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.lightBlue.withValues(alpha: 0.1),
+                        color: AppTheme.greenColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: Colors.lightBlue.withValues(alpha: 0.4),
+                          color: AppTheme.greenColor.withValues(alpha: 0.4),
                         ),
                       ),
                       child: Column(
@@ -419,7 +420,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Colors.lightBlue,
+                              color: AppTheme.greenColor,
                             ),
                           ),
                           Text(
@@ -540,7 +541,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
                     color: color,
                     borderRadius: BorderRadius.circular(4),
                     border: isSelected
-                        ? Border.all(color: Colors.white, width: 2)
+                        ? Border.all(color: AppTheme.primaryColor, width: 2)
                         : null,
                   ),
                   child: Center(
@@ -550,7 +551,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen>
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         color:
-                            stat.frecuencia == 0 ? Colors.grey : Colors.white,
+                            stat.frecuencia == 0 ? Colors.grey : AppTheme.textPrimary,
                       ),
                     ),
                   ),

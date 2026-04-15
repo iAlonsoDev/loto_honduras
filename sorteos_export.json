@@ -7753,5 +7753,70 @@
     "maniana": 77,
     "tarde": 78,
     "noche": 88
+  },
+  "2026-04-01": {
+    "maniana": 97,
+    "tarde": 90,
+    "noche": 47
+  },
+  "2026-04-02": {
+    "maniana": 65,
+    "tarde": 42,
+    "noche": 69
+  },
+  "2026-04-03": {
+    "maniana": 76,
+    "tarde": 1,
+    "noche": 63
+  },
+  "2026-04-04": {
+    "maniana": 39,
+    "tarde": 44,
+    "noche": 28
+  },
+  "2026-04-05": {
+    "maniana": 80,
+    "tarde": 95,
+    "noche": 6
+  },
+  "2026-04-06": {
+    "maniana": 88,
+    "tarde": 14,
+    "noche": 79
+  },
+  "2026-04-07": {
+    "maniana": 32,
+    "tarde": 89,
+    "noche": 82
+  },
+  "2026-04-08": {
+    "maniana": 53,
+    "tarde": 54,
+    "noche": 72
+  },
+  "2026-04-09": {
+    "maniana": 10,
+    "tarde": 22,
+    "noche": 81
+  },
+  "2026-04-10": {
+    "maniana": 91,
+    "tarde": 45,
+    "noche": 16
+  },
+  "2026-04-11": {
+    "maniana": 27,
+    "tarde": 77,
+    "noche": 71
+  },
+  "2026-04-12": {
+    "maniana": 87,
+    "tarde": 59,
+    "noche": 92
+  },
+  "2026-04-13": {
+    "maniana": 95,
+    "tarde": 46,
+    "noche": 87
   }
 }

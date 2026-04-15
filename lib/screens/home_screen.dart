@@ -6,7 +6,6 @@ import 'registro_screen.dart';
 import 'historial_screen.dart';
 import 'estadisticas_screen.dart';
 import 'analisis_screen.dart';
-import 'simbolos_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,53 +17,46 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
+  static const _screens = [
     RegistroScreen(),
     HistorialScreen(),
-    SimbolosScreen(),
     EstadisticasScreen(),
     AnalisisScreen(),
+  ];
+
+  static const _items = [
+    (Icons.casino_outlined,    Icons.casino_rounded,    ''),
+    (Icons.history_outlined,   Icons.history_rounded,   ''),
+    (Icons.bar_chart_outlined, Icons.bar_chart_rounded, ''),
+    (Icons.insights_outlined,  Icons.insights_rounded,  ''),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: AppTheme.cardColor,
-        selectedItemColor: AppTheme.goldColor,
-        unselectedItemColor: Colors.grey,
-        selectedLabelStyle: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 11,
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: AppTheme.cardBorder)),
         ),
-        unselectedLabelStyle: const TextStyle(fontSize: 11),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.casino_rounded),
-            label: 'Registro',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history_rounded),
-            label: 'Historial',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.auto_awesome_rounded),
-            label: 'Simbología',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_rounded),
-            label: 'Estadísticas',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.insights_rounded),
-            label: 'Análisis',
-          ),
-          
-        ],
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: AppTheme.bgLight,
+          selectedItemColor: AppTheme.primaryColor,
+          unselectedItemColor: AppTheme.textSecondary,
+          showSelectedLabels: false,
+          showUnselectedLabels: false,
+          items: _items.map((e) {
+            final (iconOut, iconFilled, label) = e;
+            return BottomNavigationBarItem(
+              icon: Icon(iconOut),
+              activeIcon: Icon(iconFilled),
+              label: label,
+            );
+          }).toList(),
+        ),
       ),
     );
   }
