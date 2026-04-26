@@ -951,13 +951,17 @@ class _HistorialScreenState extends State<HistorialScreen> {
                         : ListView.builder(
                             padding:
                                 const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                            itemCount: _filtrados.length,
-                            itemBuilder: (ctx, i) => _buildSorteoCard(
-                              _filtrados[i],
-                              prevSorteo: i + 1 < _filtrados.length
-                                  ? _filtrados[i + 1]
-                                  : null,
-                            ),
+                            itemCount: _filtrados.length + 1,
+                            itemBuilder: (ctx, i) {
+                              if (i == 0) return _buildPronostico();
+                              final idx = i - 1;
+                              return _buildSorteoCard(
+                                _filtrados[idx],
+                                prevSorteo: idx + 1 < _filtrados.length
+                                    ? _filtrados[idx + 1]
+                                    : null,
+                              );
+                            },
                           ),
           ),
         ],
@@ -1031,6 +1035,10 @@ class _HistorialScreenState extends State<HistorialScreen> {
         sorteo.fecha.month == DateTime.now().month &&
         sorteo.fecha.day == DateTime.now().day;
 
+    final familiasHoy  = _familiasDelDia(sorteo);
+    final familiasPrev = prevSorteo != null ? _familiasDelDia(prevSorteo) : <String>{};
+    final rachas = familiasHoy.intersection(familiasPrev);
+
     return Card(
         margin: const EdgeInsets.only(bottom: 6),
         elevation: 0,
@@ -1039,7 +1047,10 @@ class _HistorialScreenState extends State<HistorialScreen> {
           side: BorderSide(
             color: esHoy
                 ? AppTheme.goldColor.withOpacity(0.5)
-                : AppTheme.cardBorder,
+                : rachas.isNotEmpty
+                    ? _colorFamilia(rachas.first).withOpacity(0.5)
+                    : AppTheme.cardBorder,
+            width: rachas.isNotEmpty ? 1.5 : 1.0,
           ),
         ),
         child: Padding(
@@ -1052,31 +1063,66 @@ class _HistorialScreenState extends State<HistorialScreen> {
                   if (esHoy)
                     Container(
                       margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                       decoration: BoxDecoration(
                         color: AppTheme.goldColor,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text('HOY',
-                          style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold)),
+                          style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold)),
                     ),
                   Expanded(
                     child: Text(fecha,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
-                          color: esHoy
-                              ? AppTheme.goldColor
-                              : AppTheme.textSecondary,
+                          color: esHoy ? AppTheme.goldColor : AppTheme.textSecondary,
                         )),
                   ),
-                  
+                  // Badges de familia del día — tap para ver números
+                  ...familiasHoy.map((f) {
+                    final c = _colorFamilia(f);
+                    final esRacha = rachas.contains(f);
+                    return GestureDetector(
+                      onTap: () => _mostrarFamilia(f, c),
+                      child: Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: c.withOpacity(esRacha ? 0.25 : 0.1),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: c.withOpacity(esRacha ? 0.8 : 0.3)),
+                        ),
+                        child: Text(
+                          esRacha ? '🔥$f' : f,
+                          style: TextStyle(fontSize: 9, color: c, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    );
+                  }),
                 ],
               ),
+              // Racha: mensaje si la misma familia continuó desde ayer
+              if (rachas.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    children: [
+                      ...rachas.map((f) => Container(
+                        margin: const EdgeInsets.only(right: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: _colorFamilia(f).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '↑ familia $f continúa',
+                          style: TextStyle(fontSize: 9, color: _colorFamilia(f)),
+                        ),
+                      )),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -1374,6 +1420,375 @@ class _HistorialScreenState extends State<HistorialScreen> {
       ),
       builder: (ctx) => _buildSubseleccionSuma(suma),
     );
+  }
+
+  // ── Pronóstico noche ─────────────────────────────────────────────────────────
+
+  // Probabilidades tarde→noche calculadas del historial real (474 días)
+  static const _probNoche = {
+    'AxD': [('AxD',22),('AxA',16),('AxC',14),('AxB',12)],
+    'AxA': [('AxD',21),('AxC',19),('AxB',12),('BxD',10)],
+    'AxC': [('AxC',18),('AxD',16),('AxB',16),('AxA',13)],
+    'BxD': [('AxD',18),('AxA',16),('AxC',16),('BxD',13)],
+    'BxC': [('AxD',17),('AxA',15),('AxC',15),('BxC',13)],
+    'AxB': [('AxA',18),('AxD',17),('AxC',15),('AxB',13)],
+    'CxD': [('AxD',18),('AxA',16),('AxC',14),('CxD',12)],
+    'CxC': [('AxD',17),('AxA',16),('AxC',15),('BxC',12)],
+    'DxD': [('AxD',19),('AxA',15),('AxC',14),('BxD',12)],
+    'BxB': [('AxD',18),('AxA',17),('AxC',14),('BxD',11)],
+  };
+
+  Widget _buildPronostico() {
+    if (_sorteos.isEmpty) return const SizedBox.shrink();
+
+    final hoy = DateTime.now();
+    final hoyKey = '${hoy.year}-${hoy.month.toString().padLeft(2,'0')}-${hoy.day.toString().padLeft(2,'0')}';
+    final sorteosOrdenados = [..._sorteos]..sort((a,b) => b.fecha.compareTo(a.fecha));
+
+    // Buscar el día más reciente (hoy o ayer)
+    final reciente = sorteosOrdenados.first;
+    final recienteKey = '${reciente.fecha.year}-${reciente.fecha.month.toString().padLeft(2,'0')}-${reciente.fecha.day.toString().padLeft(2,'0')}';
+    final esHoy = recienteKey == hoyKey;
+
+    // Familia de la tarde del día reciente
+    final numTarde = reciente.numeroTarde;
+    final numNoche = reciente.numeroNoche;
+    final famTarde = numTarde != null ? _familiaDeNumero(numTarde) : null;
+    final yaJugoNoche = numNoche != null && esHoy;
+
+    // Racha activa últimos 7 días
+    final corte7 = hoy.subtract(const Duration(days: 7));
+    final ultimos7 = _sorteos.where((s) => !s.fecha.isBefore(corte7)).toList();
+    final conteoFam = <String, int>{};
+    for (final s in ultimos7) {
+      for (final n in [s.numeroManiana, s.numeroTarde, s.numeroNoche].whereType<int>()) {
+        final f = _familiaDeNumero(n);
+        conteoFam[f] = (conteoFam[f] ?? 0) + 1;
+      }
+    }
+    final famOrdenadas = conteoFam.entries.toList()..sort((a,b) => b.value.compareTo(a.value));
+    final famCaliente = famOrdenadas.isNotEmpty ? famOrdenadas.first.key : null;
+
+    // Predicciones para esta noche basadas en tarde
+    final preds = famTarde != null
+        ? (_probNoche[famTarde] ?? [('AxD',18),('AxA',16),('AxC',14)])
+        : <(String,int)>[];
+
+    // Números candidatos de la familia más probable para noche
+    final famPred = preds.isNotEmpty ? preds.first.$1 : famCaliente;
+    final candidatos = famPred != null
+        ? [for (int n = 0; n <= 99; n++) n]
+            .where((n) => _familiaDeNumero(n) == famPred)
+            .toList()
+        : <int>[];
+
+    // Ordenar candidatos por días sin salir (presión)
+    final stats = _db.calcularEstadisticas();
+    candidatos.sort((a, b) {
+      final da = stats[a]?.diasSinSalir() ?? 0;
+      final db = stats[b]?.diasSinSalir() ?? 0;
+      return db.compareTo(da);
+    });
+
+    final colorCaliente = famCaliente != null ? _colorFamilia(famCaliente) : AppTheme.goldColor;
+    final colorPred = famPred != null ? _colorFamilia(famPred) : AppTheme.goldColor;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: colorPred.withOpacity(0.5), width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Título
+            Row(
+              children: [
+                const Text('🎯', style: TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                const Text('Pronóstico esta noche',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const Spacer(),
+                if (yaJugoNoche)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('✓ Ya jugó', style: TextStyle(color: Colors.green, fontSize: 10)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Familia caliente 7d
+            if (famCaliente != null) ...[
+              Row(
+                children: [
+                  const Text('🔥 En racha (7d):', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => _mostrarFamilia(famCaliente, colorCaliente),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: colorCaliente.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: colorCaliente.withOpacity(0.6)),
+                      ),
+                      child: Text('$famCaliente  ${conteoFam[famCaliente]}x',
+                          style: TextStyle(color: colorCaliente, fontWeight: FontWeight.bold, fontSize: 11)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            // Si tarde ya jugó → probabilidades para noche
+            if (famTarde != null && preds.isNotEmpty) ...[
+              Row(
+                children: [
+                  const Text('☀️ Tarde jugó:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _colorFamilia(famTarde).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(color: _colorFamilia(famTarde).withOpacity(0.5)),
+                    ),
+                    child: Text('$famTarde (${numTarde.toString().padLeft(2,'0')} · ${significadoCorto(numTarde!)})',
+                        style: TextStyle(color: _colorFamilia(famTarde), fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text('🌙 Familia más probable esta noche:',
+                  style: TextStyle(fontSize: 11, color: Colors.grey)),
+              const SizedBox(height: 6),
+              Row(
+                children: preds.take(3).map((p) {
+                  final c = _colorFamilia(p.$1);
+                  final esPrimera = p == preds.first;
+                  return GestureDetector(
+                    onTap: () => _mostrarFamilia(p.$1, c),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: c.withOpacity(esPrimera ? 0.25 : 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: c.withOpacity(esPrimera ? 0.8 : 0.3),
+                            width: esPrimera ? 1.5 : 1),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(p.$1,
+                              style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text('${p.$2}%',
+                              style: TextStyle(color: c.withOpacity(0.8), fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Candidatos de la familia más probable
+            if (candidatos.isNotEmpty) ...[
+              Row(
+                children: [
+                  Text('🎲 Candidatos ($famPred) — ordenados por presión:',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: candidatos.take(8).map((n) {
+                  final dias = stats[n]?.diasSinSalir() ?? 0;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: colorPred.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: colorPred.withOpacity(0.4)),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(n.toString().padLeft(2, '0'),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colorPred)),
+                        Text(significadoCorto(n),
+                            style: const TextStyle(fontSize: 8, color: Colors.grey)),
+                        Text('${dias}d',
+                            style: TextStyle(fontSize: 8, color: colorPred.withOpacity(0.7))),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                '* Toca una familia para ver todos sus números',
+                style: TextStyle(fontSize: 9, color: Colors.grey),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Popup familia ────────────────────────────────────────────────────────────
+
+  void _mostrarFamilia(String familia, Color color) {
+    // Todos los números de esta familia
+    final nums = [for (int n = 0; n <= 99; n++) n]
+        .where((n) => _familiaDeNumero(n) == familia)
+        .toList();
+
+    // Frecuencia histórica de cada número
+    final freq = <int, int>{};
+    for (final s in _sorteos) {
+      for (final n in [s.numeroManiana, s.numeroTarde, s.numeroNoche].whereType<int>()) {
+        if (nums.contains(n)) freq[n] = (freq[n] ?? 0) + 1;
+      }
+    }
+    nums.sort((a, b) => (freq[b] ?? 0).compareTo(freq[a] ?? 0));
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Título
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: color.withOpacity(0.6)),
+                  ),
+                  child: Text(
+                    'Familia $familia',
+                    style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+                Text(
+                  '${nums.length} números · por frecuencia',
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            // Grid de números
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: nums.map((n) {
+                final veces = freq[n] ?? 0;
+                final sig   = significadoCorto(n);
+                return Container(
+                  width: 72,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: color.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        n.toString().padLeft(2, '0'),
+                        style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold, color: color,
+                        ),
+                      ),
+                      Text(
+                        sig,
+                        style: const TextStyle(fontSize: 9, color: Colors.grey),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${veces}x',
+                        style: TextStyle(fontSize: 9, color: color.withOpacity(0.7)),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Familias de quebrados ────────────────────────────────────────────────────
+
+  String _digitoFamilia(int d) {
+    if (d == 0 || d == 1 || d == 4 || d == 7) return 'A';
+    if (d == 2 || d == 5) return 'B';
+    if (d == 3 || d == 8) return 'C';
+    return 'D';
+  }
+
+  String _familiaDeNumero(int n) {
+    final parts = [_digitoFamilia(n ~/ 10), _digitoFamilia(n % 10)]..sort();
+    return '${parts[0]}×${parts[1]}';
+  }
+
+  Set<String> _familiasDelDia(SorteoModel s) => {
+    for (final n in [s.numeroManiana, s.numeroTarde, s.numeroNoche].whereType<int>())
+      _familiaDeNumero(n),
+  };
+
+  Color _colorFamilia(String f) {
+    switch (f) {
+      case 'A×A': return const Color(0xFFFFB300); // ámbar
+      case 'A×B': return const Color(0xFF66BB6A); // verde
+      case 'A×C': return const Color(0xFF26C6DA); // teal
+      case 'A×D': return const Color(0xFF42A5F5); // azul
+      case 'B×B': return const Color(0xFFAB47BC); // púrpura
+      case 'B×C': return const Color(0xFFEC407A); // rosa
+      case 'B×D': return const Color(0xFFFF7043); // naranja
+      case 'C×C': return const Color(0xFF8D6E63); // marrón
+      case 'C×D': return const Color(0xFF78909C); // gris azulado
+      default:    return const Color(0xFF5C6BC0); // índigo (D×D)
+    }
   }
 
   @override
